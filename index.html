@@ -88,7 +88,23 @@
 
 </div>
 
-<script src="converter.js"></script>
+<script>
+    document.getElementById("status").textContent =
+        "✅ JavaScript de la página funciona.\n\nCargando conversor...";
+
+    window.addEventListener("error", function (event) {
+        document.getElementById("status").textContent =
+            "❌ ERROR EN CONVERTER.JS:\n\n" +
+            event.message;
+    });
+</script>
+
+<script src="./converter.js?v=7"></script>
+
+<script>
+    document.getElementById("status").textContent =
+        "✅ FNF Web Converter V7 cargado.\n\nSelecciona tu EXE.";
+</script>
 
 </body>
 </html>
