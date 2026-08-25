@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>FNF Web Converter</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            font-family: Arial, sans-serif;
+
+            background: #101010;
+            color: white;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+
+            padding: 40px;
+
+            text-align: center;
+
+            border: 2px solid #333;
+            border-radius: 20px;
+
+            background: #181818;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 42px;
+        }
+
+        .drop-zone {
+            margin-top: 30px;
+
+            padding: 60px 20px;
+
+            border: 3px dashed #555;
+            border-radius: 15px;
+
+            cursor: pointer;
+
+            transition: 0.2s;
+        }
+
+        .drop-zone:hover {
+            border-color: white;
+            background: #222;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        button {
+            margin-top: 25px;
+
+            padding: 14px 30px;
+
+            border: none;
+            border-radius: 10px;
+
+            background: white;
+            color: black;
+
+            font-size: 16px;
+            font-weight: bold;
+
+            cursor: pointer;
+        }
+
+        button:hover {
+            opacity: 0.8;
+        }
+
+        #status {
+            margin-top: 25px;
+
+            text-align: left;
+
+            white-space: pre-wrap;
+
+            font-family: monospace;
+
+            background: #0b0b0b;
+
+            padding: 20px;
+
+            border-radius: 10px;
+
+            min-height: 120px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>🎵 FNF Web Converter</h1>
+
+    <p>
+        Analizador experimental de juegos FNF
+    </p>
+
+    <label class="drop-zone" id="dropZone">
+
+        📦<br><br>
+
+        <strong>
+            Selecciona tu archivo .EXE
+        </strong>
+
+        <br>
+
+        o arrástralo aquí
+
+        <input
+            id="fileInput"
+            type="file"
+            accept=".exe"
+        >
+
+    </label>
+
+    <button id="analyze">
+        🔎 ANALIZAR EXE
+    </button>
+
+    <div id="status">
+Esperando archivo...
+    </div>
+
+</div>
+
+<script>
+
+const fileInput =
+    document.getElementById("fileInput");
+
+const dropZone =
+    document.getElementById("dropZone");
+
+const analyzeButton =
+    document.getElementById("analyze");
+
+const status =
+    document.getElementById("status");
+
+let selectedFile = null;
+
+
+// Selección normal
+dropZone.addEventListener(
+    "click",
+    () => {
+        fileInput.click();
+    }
+);
+
+
+// Archivo seleccionado
+fileInput.addEventListener(
+    "change",
+    () => {
+
+        if (!fileInput.files.length)
+            return;
+
+        selectedFile =
+            fileInput.files[0];
+
+        showFile();
+    }
+);
+
+
+// Drag & Drop
+dropZone.addEventListener(
+    "dragover",
+    event => {
+
+        event.preventDefault();
+
+        dropZone.style.background =
+            "#252525";
+    }
+);
+
+
+dropZone.addEventListener(
+    "dragleave",
+    () => {
+
+        dropZone.style.background =
+            "";
+    }
+);
+
+
+dropZone.addEventListener(
+    "drop",
+    event => {
+
+        event.preventDefault();
+
+        dropZone.style.background =
+            "";
+
+        if (!event.dataTransfer.files.length)
+            return;
+
+        selectedFile =
+            event.dataTransfer.files[0];
+
+        showFile();
+    }
+);
+
+
+// Mostrar archivo
+function showFile()
+{
+    const size =
+        (
+            selectedFile.size /
+            1024 /
+            1024
+        ).toFixed(2);
+
+    status.textContent =
+        "Archivo seleccionado:\n\n" +
+        selectedFile.name +
+        "\n\n" +
+        "Tamaño: " +
+        size +
+        " MB";
+}
+
+
+// Analizar
+analyzeButton.addEventListener(
+    "click",
+    async () => {
+
+        if (!selectedFile)
+        {
+            status.textContent =
+                "❌ Primero selecciona un EXE.";
+
+            return;
+        }
+
+        status.textContent =
+            "🔎 Analizando...\n\n";
+
+        const buffer =
+            await selectedFile.arrayBuffer();
+
+        const bytes =
+            new Uint8Array(buffer);
+
+        analyzeEXE(bytes);
+    }
+);
+
+
+function findText(bytes, text)
+{
+    const target =
+        new TextEncoder().encode(text);
+
+    for (
+        let i = 0;
+        i <= bytes.length - target.length;
+        i++
+    )
+    {
+        let match = true;
+
+        for (
+            let j = 0;
+            j < target.length;
+            j++
+        )
+        {
+            if (
+                bytes[i + j] !==
+                target[j]
+            )
+            {
+                match = false;
+                break;
+            }
+        }
+
+        if (match)
+            return true;
+    }
+
+    return false;
+}
+
+
+function analyzeEXE(bytes)
+{
+    let result = "";
+
+    // ----------------------------------------
+    // PE
+    // ----------------------------------------
+
+    const isPE =
+        bytes[0] === 0x4D &&
+        bytes[1] === 0x5A;
+
+    if (isPE)
+        result += "✅ Ejecutable PE válido\n";
+    else
+        result += "⚠️ No parece un PE estándar\n";
+
+
+    // ----------------------------------------
+    // FNF
+    // ----------------------------------------
+
+    const fnf =
+        findText(
+            bytes,
+            "Friday Night Funkin"
+        ) ||
+        findText(
+            bytes,
+            "funkin"
+        ) ||
+        findText(
+            bytes,
+            "FNF"
+        );
+
+    if (fnf)
+        result +=
+            "🎵 FNF detectado\n";
+    else
+        result +=
+            "❓ FNF no detectado directamente\n";
+
+
+    // ----------------------------------------
+    // Psych Engine
+    // ----------------------------------------
+
+    const psych =
+        findText(
+            bytes,
+            "Psych Engine"
+        ) ||
+        findText(
+            bytes,
+            "PsychEngine"
+        );
+
+    if (psych)
+        result +=
+            "⚡ Psych Engine detectado\n";
+    else
+        result +=
+            "❓ Psych Engine no detectado directamente\n";
+
+
+    // ----------------------------------------
+    // HaxeFlixel
+    // ----------------------------------------
+
+    const flixel =
+        findText(
+            bytes,
+            "HaxeFlixel"
+        ) ||
+        findText(
+            bytes,
+            "flixel"
+        );
+
+    if (flixel)
+        result +=
+            "🎮 HaxeFlixel detectado\n";
+    else
+        result +=
+            "❓ HaxeFlixel no detectado directamente\n";
+
+
+    // ----------------------------------------
+    // Recursos
+    // ----------------------------------------
+
+    const text =
+        new TextDecoder(
+            "latin1"
+        ).decode(bytes);
+
+    const png =
+        count(
+            text,
+            ".png"
+        );
+
+    const ogg =
+        count(
+            text,
+            ".ogg"
+        );
+
+    const json =
+        count(
+            text,
+            ".json"
+        );
+
+    const lua =
+        count(
+            text,
+            ".lua"
+        );
+
+
+    result += "\n";
+    result += "📦 POSIBLES RECURSOS\n\n";
+
+    result +=
+        "PNG: " +
+        png +
+        "\n";
+
+    result +=
+        "OGG: " +
+        ogg +
+        "\n";
+
+    result +=
+        "JSON: " +
+        json +
+        "\n";
+
+    result +=
+        "LUA: " +
+        lua +
+        "\n";
+
+
+    result += "\n";
+    result +=
+        "⚠️ Estos números son aproximados.\n";
+
+    result +=
+        "El EXE todavía NO ha sido convertido.\n";
+
+    result +=
+        "La siguiente etapa será extraer recursos y construir el runtime HTML5.";
+
+    status.textContent =
+        result;
+}
+
+
+function count(text, value)
+{
+    let total = 0;
+    let position = 0;
+
+    while (
+        (position =
+            text.indexOf(
+                value,
+                position
+            )) !== -1
+    )
+    {
+        total++;
+
+        position +=
+            value.length;
+    }
+
+    return total;
+}
+
+</script>
+
+</body>
+</html>
