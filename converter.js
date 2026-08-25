@@ -1,4 +1,3 @@
-```javascript
 "use strict";
 
 /*
@@ -3972,4 +3971,3 @@ extractButton.addEventListener(
         }
     }
 );
-```
