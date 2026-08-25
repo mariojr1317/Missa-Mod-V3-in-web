@@ -1,662 +1,365 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
-    <meta
-        name="description"
-        content="FNF Web Converter - Analizador y preparador de juegos FNF para web"
-    >
-
-    <title>FNF Web Converter V4</title>
-
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        html,
-        body {
-            margin: 0;
-            padding: 0;
-            min-height: 100%;
-        }
-
-        body {
-            min-height: 100vh;
-
-            display: flex;
-            justify-content: center;
-
-            padding: 30px 15px;
-
-            background:
-                radial-gradient(
-                    circle at top,
-                    #252525,
-                    #0d0d0d 65%
-                );
-
-            color: white;
-
-            font-family:
-                Arial,
-                Helvetica,
-                sans-serif;
-        }
-
-        .app {
-            width: 100%;
-            max-width: 900px;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 25px;
-        }
-
-        .header h1 {
-            margin: 0;
-
-            font-size: clamp(
-                32px,
-                7vw,
-                58px
-            );
-        }
-
-        .header p {
-            color: #aaa;
-            margin-top: 10px;
-        }
-
-        .version {
-            display: inline-block;
-
-            margin-top: 10px;
-
-            padding: 6px 12px;
-
-            border-radius: 999px;
-
-            background: #242424;
-
-            color: #aaa;
-
-            font-family: monospace;
-        }
-
-        .card {
-            background: #181818;
-
-            border: 1px solid #333;
-
-            border-radius: 20px;
-
-            padding: 25px;
-
-            box-shadow:
-                0 20px 60px
-                rgba(0, 0, 0, 0.45);
-        }
-
-        .drop-zone {
-            width: 100%;
-            min-height: 250px;
-
-            display: flex;
-            flex-direction: column;
-
-            align-items: center;
-            justify-content: center;
-
-            gap: 10px;
-
-            border:
-                3px dashed
-                #555;
-
-            border-radius: 18px;
-
-            background: #111;
-
-            cursor: pointer;
-
-            transition:
-                background 0.2s,
-                border-color 0.2s,
-                transform 0.2s;
-        }
-
-        .drop-zone:hover,
-        .drop-zone.dragging {
-            background: #202020;
-
-            border-color: #fff;
-
-            transform:
-                scale(1.01);
-        }
-
-        .drop-icon {
-            font-size: 64px;
-        }
-
-        .drop-title {
-            font-size: 22px;
-            font-weight: bold;
-        }
-
-        .drop-subtitle {
-            color: #888;
-        }
-
-        #fileInput {
-            display: none;
-        }
-
-        .buttons {
-            display: flex;
-
-            gap: 12px;
-
-            flex-wrap: wrap;
-
-            margin-top: 20px;
-        }
-
-        button {
-            flex: 1;
-
-            min-width: 200px;
-
-            padding: 14px 20px;
-
-            border: 0;
-
-            border-radius: 10px;
-
-            font-size: 16px;
-
-            font-weight: bold;
-
-            cursor: pointer;
-
-            background: white;
-
-            color: #111;
-
-            transition:
-                transform 0.15s,
-                opacity 0.15s;
-        }
-
-        button:hover:not(:disabled) {
-            transform:
-                translateY(-2px);
-        }
-
-        button:disabled {
-            opacity: 0.4;
-
-            cursor: not-allowed;
-        }
-
-        #status {
-            margin-top: 20px;
-
-            padding: 18px;
-
-            min-height: 90px;
-
-            border-radius: 12px;
-
-            background: #0b0b0b;
-
-            color: #ddd;
-
-            white-space: pre-wrap;
-
-            font-family:
-                "Courier New",
-                monospace;
-
-            overflow-wrap: anywhere;
-        }
-
-        .results {
-            margin-top: 20px;
-
-            display: grid;
-
-            grid-template-columns:
-                repeat(
-                    auto-fit,
-                    minmax(
-                        220px,
-                        1fr
-                    )
-                );
-
-            gap: 12px;
-        }
-
-        .result {
-            padding: 16px;
-
-            border-radius: 12px;
-
-            background: #222;
-
-            border-left:
-                4px solid #888;
-        }
-
-        .result.good {
-            border-left-color:
-                #4caf50;
-        }
-
-        .result.warn {
-            border-left-color:
-                #ff9800;
-        }
-
-        .result.bad {
-            border-left-color:
-                #f44336;
-        }
-
-        .result-title {
-            font-weight: bold;
-
-            margin-bottom: 7px;
-        }
-
-        .result-value {
-            color: #bbb;
-
-            font-family: monospace;
-        }
-
-        .progress {
-            width: 100%;
-
-            height: 12px;
-
-            margin-top: 15px;
-
-            border-radius: 999px;
-
-            background: #292929;
-
-            overflow: hidden;
-
-            display: none;
-        }
-
-        .progress-bar {
-            height: 100%;
-
-            width: 0%;
-
-            background: white;
-
-            transition:
-                width 0.15s;
-        }
-
-        .note {
-            margin-top: 20px;
-
-            color: #888;
-
-            font-size: 14px;
-
-            line-height: 1.6;
-        }
-
-        .download {
-            display: none;
-
-            margin-top: 20px;
-
-            padding: 18px;
-
-            border-radius: 12px;
-
-            background: #202020;
-
-            border:
-                1px solid
-                #333;
-        }
-
-        .download strong {
-            display: block;
-
-            margin-bottom: 8px;
-        }
-
-        .download a {
-            color: white;
-
-            font-weight: bold;
-
-            text-decoration: none;
-        }
-
-        .footer {
-            margin-top: 20px;
-
-            text-align: center;
-
-            color: #666;
-
-            font-size: 13px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>FNF EXE → HTML5</title>
+
+<style>
+*{
+    box-sizing:border-box;
+}
+
+body{
+    margin:0;
+    min-height:100vh;
+    background:#0d0d0d;
+    color:#fff;
+    font-family:Arial,sans-serif;
+    display:flex;
+    justify-content:center;
+    padding:30px 15px;
+}
+
+.app{
+    width:100%;
+    max-width:900px;
+}
+
+h1{
+    text-align:center;
+    font-size:42px;
+}
+
+.subtitle{
+    text-align:center;
+    color:#aaa;
+}
+
+.card{
+    background:#181818;
+    border:1px solid #333;
+    border-radius:18px;
+    padding:25px;
+    margin-top:25px;
+}
+
+.drop{
+    min-height:220px;
+    border:3px dashed #555;
+    border-radius:16px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
+    text-align:center;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.drop:hover,
+.drop.drag{
+    background:#222;
+    border-color:#fff;
+}
+
+.icon{
+    font-size:65px;
+}
+
+#file{
+    display:none;
+}
+
+.buttons{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    margin-top:20px;
+}
+
+button{
+    flex:1;
+    min-width:220px;
+    padding:14px;
+    border:0;
+    border-radius:10px;
+    font-weight:bold;
+    cursor:pointer;
+    font-size:16px;
+}
+
+button:disabled{
+    opacity:.4;
+    cursor:not-allowed;
+}
+
+#status{
+    margin-top:20px;
+    background:#090909;
+    padding:18px;
+    border-radius:10px;
+    white-space:pre-wrap;
+    font-family:monospace;
+}
+
+.results{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:10px;
+    margin-top:20px;
+}
+
+.result{
+    background:#222;
+    border-radius:10px;
+    padding:15px;
+}
+
+.good{
+    border-left:4px solid #4caf50;
+}
+
+.warn{
+    border-left:4px solid #ff9800;
+}
+
+.progress{
+    width:100%;
+    height:10px;
+    background:#333;
+    border-radius:20px;
+    overflow:hidden;
+    margin-top:20px;
+}
+
+.bar{
+    height:100%;
+    width:0%;
+    background:#fff;
+    transition:.1s;
+}
+</style>
 </head>
 
 <body>
 
 <div class="app">
 
-    <header class="header">
+    <h1>🎵 FNF EXE → HTML5</h1>
 
-        <h1>🎵 FNF Web Converter</h1>
+    <div class="subtitle">
+        Extractor experimental para FNF / Psych Engine
+    </div>
 
-        <p>
-            Analizador y preparador de juegos
-            Friday Night Funkin' para web
-        </p>
-
-        <span class="version">
-            V4 REAL EXTRACTOR
-        </span>
-
-    </header>
-
-
-    <section class="card">
+    <div class="card">
 
         <label
-            class="drop-zone"
-            id="dropZone"
+            class="drop"
+            id="drop"
         >
 
-            <div class="drop-icon">
-                📦
-            </div>
+            <div class="icon">📦</div>
 
-            <div class="drop-title">
-                Selecciona tu EXE
-            </div>
+            <strong>
+                Selecciona MissaMod.exe
+            </strong>
 
-            <div class="drop-subtitle">
-                Haz clic o arrastra
-                <strong>MissaMod.exe</strong>
-                aquí
-            </div>
+            <span>
+                o arrástralo aquí
+            </span>
 
             <input
-                id="fileInput"
+                id="file"
                 type="file"
                 accept=".exe"
             >
 
         </label>
 
-
         <div class="buttons">
 
             <button
-                id="analyzeButton"
-                type="button"
+                id="analyze"
+                disabled
             >
-                🔎 Analizar EXE
+                🔎 Analizar
             </button>
 
             <button
-                id="extractButton"
-                type="button"
+                id="extract"
                 disabled
             >
-                🚀 Extraer recursos
+                🚀 EXTRAER Y GENERAR ZIP
             </button>
 
         </div>
 
-
-        <div
-            class="progress"
-            id="progress"
-        >
+        <div class="progress">
             <div
-                class="progress-bar"
-                id="progressBar"
+                class="bar"
+                id="bar"
             ></div>
         </div>
 
-
         <div id="status">
-            ✅ Página V4 cargada correctamente.
-
-            Selecciona un archivo EXE para comenzar.
+            Página cargada correctamente.
         </div>
-
 
         <div
             class="results"
             id="results"
         ></div>
 
-
-        <div
-            class="download"
-            id="downloadBox"
-        >
-
-            <strong>
-                ✅ Proyecto generado
-            </strong>
-
-            <span>
-                Descarga:
-            </span>
-
-            <a
-                id="downloadLink"
-                href="#"
-            >
-                MissaWeb.zip
-            </a>
-
-        </div>
-
-
-        <div class="note">
-            El EXE se procesa localmente en el navegador.
-            No se sube automáticamente a GitHub.
-            Esta herramienta intenta identificar y
-            extraer recursos embebidos reconocibles;
-            no convierte directamente el código nativo
-            de Windows en JavaScript.
-        </div>
-
-    </section>
-
-
-    <footer class="footer">
-        FNF Web Converter V4
-    </footer>
+    </div>
 
 </div>
 
 
+<script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+
 <script>
 
-/* ============================================================
-   CONFIGURACIÓN
-============================================================ */
+"use strict";
 
-const VERSION =
-    "4.0.0";
-
-
-/* ============================================================
-   ELEMENTOS
-============================================================ */
 
 const fileInput =
-    document.getElementById(
-        "fileInput"
-    );
+    document.getElementById("file");
 
-const dropZone =
-    document.getElementById(
-        "dropZone"
-    );
+const drop =
+    document.getElementById("drop");
 
 const analyzeButton =
-    document.getElementById(
-        "analyzeButton"
-    );
+    document.getElementById("analyze");
 
 const extractButton =
-    document.getElementById(
-        "extractButton"
-    );
+    document.getElementById("extract");
 
-const statusBox =
-    document.getElementById(
-        "status"
-    );
+const status =
+    document.getElementById("status");
 
-const resultsBox =
-    document.getElementById(
-        "results"
-    );
+const results =
+    document.getElementById("results");
 
-const progress =
-    document.getElementById(
-        "progress"
-    );
+const bar =
+    document.getElementById("bar");
 
-const progressBar =
-    document.getElementById(
-        "progressBar"
-    );
-
-const downloadBox =
-    document.getElementById(
-        "downloadBox"
-    );
-
-const downloadLink =
-    document.getElementById(
-        "downloadLink"
-    );
+let file = null;
+let bytes = null;
+let analysis = null;
 
 
 /* ============================================================
-   ESTADO
-============================================================ */
-
-let selectedFile =
-    null;
-
-let selectedBytes =
-    null;
-
-let analysis =
-    null;
-
-
-/* ============================================================
-   ESTADO / UI
+   UTILIDADES
 ============================================================ */
 
 function setStatus(text)
 {
-    statusBox.textContent =
-        text;
+    status.textContent = text;
 }
 
 
 function setProgress(value)
 {
-    progress.style.display =
-        "block";
-
-    progressBar.style.width =
-        `${Math.max(
-            0,
-            Math.min(
-                100,
-                value
-            )
-        )}%`;
+    bar.style.width =
+        `${value}%`;
 }
 
 
-function resetProgress()
+function bytesToMB(value)
 {
-    progress.style.display =
-        "none";
-
-    progressBar.style.width =
-        "0%";
-}
-
-
-function formatBytes(bytes)
-{
-    if (bytes < 1024)
-        return `${bytes} B`;
-
-    if (
-        bytes <
-        1024 * 1024
-    )
-    {
-        return `${
-            (
-                bytes /
-                1024
-            ).toFixed(2)
-        } KB`;
-    }
-
-    if (
-        bytes <
-        1024 *
-        1024 *
+    return (
+        value /
+        1024 /
         1024
+    ).toFixed(2);
+}
+
+
+function signature(
+    bytes,
+    offset,
+    sig
+)
+{
+    if (
+        offset +
+        sig.length >
+        bytes.length
     )
     {
-        return `${
-            (
-                bytes /
-                1024 /
-                1024
-            ).toFixed(2)
-        } MB`;
+        return false;
     }
 
-    return `${
-        (
-            bytes /
-            1024 /
-            1024 /
-            1024
-        ).toFixed(2)
-    } GB`;
+    for (
+        let i = 0;
+        i < sig.length;
+        i++
+    )
+    {
+        if (
+            bytes[offset + i] !==
+            sig[i]
+        )
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
+function find(
+    bytes,
+    sig,
+    start = 0
+)
+{
+    for (
+        let i = start;
+        i + sig.length <= bytes.length;
+        i++
+    )
+    {
+        if (
+            signature(
+                bytes,
+                i,
+                sig
+            )
+        )
+        {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+
+function u32(
+    bytes,
+    offset
+)
+{
+    return (
+        bytes[offset] |
+        (bytes[offset + 1] << 8) |
+        (bytes[offset + 2] << 16) |
+        (bytes[offset + 3] << 24)
+    ) >>> 0;
+}
+
+
+function textBytes(text)
+{
+    return Uint8Array.from(
+        [...text].map(
+            c => c.charCodeAt(0)
+        )
+    );
 }
 
 
@@ -664,12 +367,9 @@ function formatBytes(bytes)
    ARCHIVO
 ============================================================ */
 
-dropZone.addEventListener(
+drop.addEventListener(
     "click",
-    () =>
-    {
-        fileInput.click();
-    }
+    () => fileInput.click()
 );
 
 
@@ -677,12 +377,8 @@ fileInput.addEventListener(
     "change",
     () =>
     {
-        if (
-            !fileInput.files.length
-        )
-        {
+        if (!fileInput.files.length)
             return;
-        }
 
         selectFile(
             fileInput.files[0]
@@ -691,38 +387,38 @@ fileInput.addEventListener(
 );
 
 
-dropZone.addEventListener(
+drop.addEventListener(
     "dragover",
     event =>
     {
         event.preventDefault();
 
-        dropZone.classList.add(
-            "dragging"
+        drop.classList.add(
+            "drag"
         );
     }
 );
 
 
-dropZone.addEventListener(
+drop.addEventListener(
     "dragleave",
     () =>
     {
-        dropZone.classList.remove(
-            "dragging"
+        drop.classList.remove(
+            "drag"
         );
     }
 );
 
 
-dropZone.addEventListener(
+drop.addEventListener(
     "drop",
     event =>
     {
         event.preventDefault();
 
-        dropZone.classList.remove(
-            "dragging"
+        drop.classList.remove(
+            "drag"
         );
 
         if (
@@ -739,511 +435,86 @@ dropZone.addEventListener(
 );
 
 
-function selectFile(file)
+async function selectFile(selected)
 {
-    selectedFile =
-        file;
+    file = selected;
 
-    selectedBytes =
-        null;
+    setStatus(
+        `📦 ${file.name}\n` +
+        `Tamaño: ${bytesToMB(
+            file.size
+        )} MB\n\n` +
+        `Pulsa ANALIZAR.`
+    );
 
-    analysis =
-        null;
+    analyzeButton.disabled =
+        false;
 
     extractButton.disabled =
         true;
 
-    resultsBox.innerHTML =
+    results.innerHTML =
         "";
-
-    downloadBox.style.display =
-        "none";
-
-    resetProgress();
-
-    setStatus(
-        "📦 Archivo seleccionado\n\n" +
-        `Nombre: ${file.name}\n` +
-        `Tamaño: ${formatBytes(
-            file.size
-        )}\n\n` +
-        "Pulsa «Analizar EXE»."
-    );
 }
 
 
 /* ============================================================
-   BYTES
-============================================================ */
-
-function readU16LE(
-    bytes,
-    offset
-)
-{
-    if (
-        offset + 2 >
-        bytes.length
-    )
-    {
-        return 0;
-    }
-
-    return (
-        bytes[offset] |
-        (
-            bytes[offset + 1]
-            << 8
-        )
-    );
-}
-
-
-function readU32LE(
-    bytes,
-    offset
-)
-{
-    if (
-        offset + 4 >
-        bytes.length
-    )
-    {
-        return 0;
-    }
-
-    return (
-        bytes[offset] |
-        (
-            bytes[offset + 1]
-            << 8
-        ) |
-        (
-            bytes[offset + 2]
-            << 16
-        ) |
-        (
-            bytes[offset + 3]
-            << 24
-        )
-    ) >>> 0;
-}
-
-
-function asciiBytes(text)
-{
-    const result =
-        new Uint8Array(
-            text.length
-        );
-
-    for (
-        let i = 0;
-        i < text.length;
-        i++
-    )
-    {
-        result[i] =
-            text.charCodeAt(i);
-    }
-
-    return result;
-}
-
-
-function hasSignature(
-    bytes,
-    offset,
-    signature
-)
-{
-    if (
-        offset +
-        signature.length >
-        bytes.length
-    )
-    {
-        return false;
-    }
-
-    for (
-        let i = 0;
-        i < signature.length;
-        i++
-    )
-    {
-        if (
-            bytes[
-                offset + i
-            ] !==
-            signature[i]
-        )
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-
-function findSignature(
-    bytes,
-    signature,
-    start = 0
-)
-{
-    for (
-        let i = start;
-        i +
-            signature.length <=
-            bytes.length;
-        i++
-    )
-    {
-        if (
-            hasSignature(
-                bytes,
-                i,
-                signature
-            )
-        )
-        {
-            return i;
-        }
-    }
-
-    return -1;
-}
-
-
-function findText(
-    bytes,
-    text
-)
-{
-    return (
-        findSignature(
-            bytes,
-            asciiBytes(text)
-        ) !== -1
-    );
-}
-
-
-/* ============================================================
-   PE
-============================================================ */
-
-function analyzePE(bytes)
-{
-    const result =
-    {
-        valid: false,
-        machine: "Unknown"
-    };
-
-    if (
-        bytes.length < 64
-    )
-    {
-        return result;
-    }
-
-    if (
-        bytes[0] !== 0x4D ||
-        bytes[1] !== 0x5A
-    )
-    {
-        return result;
-    }
-
-    const peOffset =
-        readU32LE(
-            bytes,
-            0x3C
-        );
-
-    if (
-        peOffset + 6 >
-        bytes.length
-    )
-    {
-        return result;
-    }
-
-    if (
-        !hasSignature(
-            bytes,
-            peOffset,
-            [
-                0x50,
-                0x45,
-                0x00,
-                0x00
-            ]
-        )
-    )
-    {
-        return result;
-    }
-
-    result.valid =
-        true;
-
-    const machine =
-        readU16LE(
-            bytes,
-            peOffset + 4
-        );
-
-    switch (machine)
-    {
-        case 0x014C:
-            result.machine =
-                "x86 (32-bit)";
-            break;
-
-        case 0x8664:
-            result.machine =
-                "x64 (64-bit)";
-            break;
-
-        case 0xAA64:
-            result.machine =
-                "ARM64";
-            break;
-
-        case 0x01C4:
-            result.machine =
-                "ARM";
-            break;
-
-        default:
-            result.machine =
-                `Unknown (0x${
-                    machine.toString(16)
-                })`;
-    }
-
-    return result;
-}
-
-
-/* ============================================================
-   ANÁLISIS FNF
-============================================================ */
-
-function analyzeEXE(bytes)
-{
-    const pe =
-        analyzePE(bytes);
-
-    const fnf =
-        findText(
-            bytes,
-            "Friday Night Funkin"
-        ) ||
-        findText(
-            bytes,
-            "funkin"
-        ) ||
-        findText(
-            bytes,
-            "FNF"
-        );
-
-    const psych =
-        findText(
-            bytes,
-            "Psych Engine"
-        ) ||
-        findText(
-            bytes,
-            "PsychEngine"
-        );
-
-    const haxe =
-        findText(
-            bytes,
-            "Haxe"
-        );
-
-    const flixel =
-        findText(
-            bytes,
-            "HaxeFlixel"
-        ) ||
-        findText(
-            bytes,
-            "flixel"
-        );
-
-    const openfl =
-        findText(
-            bytes,
-            "OpenFL"
-        ) ||
-        findText(
-            bytes,
-            "openfl"
-        );
-
-    const lime =
-        findText(
-            bytes,
-            "Lime"
-        ) ||
-        findText(
-            bytes,
-            "lime"
-        );
-
-    let score = 0;
-
-    if (pe.valid)
-        score += 10;
-
-    if (fnf)
-        score += 30;
-
-    if (psych)
-        score += 30;
-
-    if (haxe)
-        score += 10;
-
-    if (flixel)
-        score += 10;
-
-    if (openfl)
-        score += 5;
-
-    if (lime)
-        score += 5;
-
-    score =
-        Math.min(
-            score,
-            100
-        );
-
-    return {
-        pe,
-        fnf,
-        psych,
-        haxe,
-        flixel,
-        openfl,
-        lime,
-        score
-    };
-}
-
-
-/* ============================================================
-   RESULTADOS
-============================================================ */
-
-function addResult(
-    title,
-    value,
-    className = ""
-)
-{
-    const element =
-        document.createElement(
-            "div"
-        );
-
-    element.className =
-        `result ${className}`;
-
-    element.innerHTML =
-        `
-        <div class="result-title">
-            ${title}
-        </div>
-
-        <div class="result-value">
-            ${value}
-        </div>
-        `;
-
-    resultsBox.appendChild(
-        element
-    );
-}
-
-
-/* ============================================================
-   ANALIZAR
+   ANÁLISIS
 ============================================================ */
 
 analyzeButton.addEventListener(
     "click",
     async () =>
     {
-        if (!selectedFile)
-        {
-            setStatus(
-                "❌ Selecciona primero un EXE."
-            );
-
+        if (!file)
             return;
-        }
 
         analyzeButton.disabled =
             true;
 
-        extractButton.disabled =
-            true;
-
-        resetProgress();
+        setStatus(
+            "📥 Leyendo el EXE..."
+        );
 
         try
         {
-            setStatus(
-                "📥 Leyendo EXE...\n\n" +
-                "El archivo se procesa localmente."
-            );
-
             const buffer =
-                await selectedFile.arrayBuffer();
+                await file.arrayBuffer();
 
-            selectedBytes =
+            bytes =
                 new Uint8Array(
                     buffer
                 );
 
-            setStatus(
-                "🔎 Analizando PE y motor..."
-            );
-
-            await new Promise(
-                resolve =>
-                    setTimeout(
-                        resolve,
-                        20
-                    )
-            );
+            setProgress(15);
 
             analysis =
-                analyzeEXE(
-                    selectedBytes
+                analyzeGame(
+                    bytes
                 );
 
-            displayAnalysis();
+            setProgress(100);
+
+            showResults();
 
             extractButton.disabled =
                 false;
+
+            setStatus(
+                "✅ Análisis terminado.\n\n" +
+                `EXE: ${file.name}\n` +
+                `Tamaño: ${bytesToMB(
+                    bytes.length
+                )} MB`
+            );
+
         }
-        catch (error)
+        catch(error)
         {
             console.error(error);
 
             setStatus(
-                "❌ Error:\n\n" +
+                "❌ Error:\n" +
                 error.message
             );
         }
@@ -1257,239 +528,348 @@ analyzeButton.addEventListener(
 
 
 /* ============================================================
-   MOSTRAR ANÁLISIS
+   DETECCIÓN
 ============================================================ */
 
-function displayAnalysis()
+function analyzeGame(bytes)
 {
-    const a =
-        analysis;
+    const pe =
+        signature(
+            bytes,
+            0,
+            [0x4D,0x5A]
+        );
 
-    setStatus(
-        "✅ ANÁLISIS TERMINADO\n\n" +
-        `Archivo: ${
-            selectedFile.name
-        }\n` +
-        `Tamaño: ${
-            formatBytes(
-                selectedFile.size
+    const fnf =
+        find(
+            bytes,
+            textBytes(
+                "Friday Night Funkin"
             )
-        }\n` +
-        `Arquitectura: ${
-            a.pe.machine
-        }\n\n` +
-        `Puntuación: ${
-            a.score
-        }/100`
-    );
+        ) !== -1 ||
+        find(
+            bytes,
+            textBytes("funkin")
+        ) !== -1;
 
-    resultsBox.innerHTML =
+    const psych =
+        find(
+            bytes,
+            textBytes(
+                "Psych Engine"
+            )
+        ) !== -1 ||
+        find(
+            bytes,
+            textBytes(
+                "PsychEngine"
+            )
+        ) !== -1;
+
+    const haxe =
+        find(
+            bytes,
+            textBytes("Haxe")
+        ) !== -1;
+
+    const flixel =
+        find(
+            bytes,
+            textBytes("HaxeFlixel")
+        ) !== -1 ||
+        find(
+            bytes,
+            textBytes("flixel")
+        ) !== -1;
+
+    const png =
+        count(
+            bytes,
+            [
+                0x89,
+                0x50,
+                0x4E,
+                0x47,
+                0x0D,
+                0x0A,
+                0x1A,
+                0x0A
+            ]
+        );
+
+    const jpg =
+        count(
+            bytes,
+            [
+                0xFF,
+                0xD8,
+                0xFF
+            ]
+        );
+
+    const ogg =
+        count(
+            bytes,
+            [
+                0x4F,
+                0x67,
+                0x67,
+                0x53
+            ]
+        );
+
+    const zip =
+        count(
+            bytes,
+            [
+                0x50,
+                0x4B,
+                0x03,
+                0x04
+            ]
+        );
+
+    const wav =
+        count(
+            bytes,
+            [
+                0x52,
+                0x49,
+                0x46,
+                0x46
+            ]
+        );
+
+    return {
+        pe,
+        fnf,
+        psych,
+        haxe,
+        flixel,
+        png,
+        jpg,
+        ogg,
+        zip,
+        wav
+    };
+}
+
+
+function count(
+    bytes,
+    sig
+)
+{
+    let total = 0;
+
+    let pos = 0;
+
+    while(true)
+    {
+        const found =
+            find(
+                bytes,
+                sig,
+                pos
+            );
+
+        if(found === -1)
+            break;
+
+        total++;
+
+        pos =
+            found +
+            sig.length;
+    }
+
+    return total;
+}
+
+
+function showResults()
+{
+    results.innerHTML =
         "";
 
-    addResult(
+    result(
         "PE",
-        a.pe.valid
+        analysis.pe
             ? "✅ Válido"
-            : "❌ No válido",
-        a.pe.valid
-            ? "good"
-            : "bad"
+            : "❌ No detectado",
+        analysis.pe
     );
 
-    addResult(
-        "Arquitectura",
-        a.pe.machine,
-        "good"
-    );
-
-    addResult(
-        "Friday Night Funkin'",
-        a.fnf
+    result(
+        "FNF",
+        analysis.fnf
             ? "✅ Detectado"
             : "❌ No detectado",
-        a.fnf
-            ? "good"
-            : "warn"
+        analysis.fnf
     );
 
-    addResult(
+    result(
         "Psych Engine",
-        a.psych
+        analysis.psych
             ? "✅ Detectado"
-            : "⚠️ No detectado directamente",
-        a.psych
-            ? "good"
-            : "warn"
+            : "⚠️ No confirmado",
+        analysis.psych
     );
 
-    addResult(
-        "Haxe",
-        a.haxe
-            ? "✅ Detectado"
-            : "No confirmado",
-        a.haxe
-            ? "good"
-            : "warn"
-    );
-
-    addResult(
+    result(
         "HaxeFlixel",
-        a.flixel
+        analysis.flixel
             ? "✅ Detectado"
-            : "No confirmado",
-        a.flixel
-            ? "good"
-            : "warn"
+            : "⚠️ No confirmado",
+        analysis.flixel
     );
 
-    addResult(
-        "OpenFL",
-        a.openfl
-            ? "✅ Detectado"
-            : "No confirmado",
-        a.openfl
-            ? "good"
-            : "warn"
+    result(
+        "PNG reales",
+        analysis.png,
+        true
     );
 
-    addResult(
-        "Lime",
-        a.lime
-            ? "✅ Detectado"
-            : "No confirmado",
-        a.lime
-            ? "good"
-            : "warn"
+    result(
+        "JPEG reales",
+        analysis.jpg,
+        true
+    );
+
+    result(
+        "OGG reales",
+        analysis.ogg,
+        true
+    );
+
+    result(
+        "RIFF/WAV",
+        analysis.wav,
+        true
+    );
+
+    result(
+        "ZIP",
+        analysis.zip,
+        true
+    );
+}
+
+
+function result(
+    title,
+    value,
+    good
+)
+{
+    const div =
+        document.createElement(
+            "div"
+        );
+
+    div.className =
+        "result " +
+        (
+            good
+                ? "good"
+                : "warn"
+        );
+
+    div.innerHTML =
+        `<strong>${title}</strong><br>${value}`;
+
+    results.appendChild(
+        div
     );
 }
 
 
 /* ============================================================
-   EXTRACCIÓN
+   EXTRACCIÓN REAL
 ============================================================ */
-
-/*
-    Esta función prepara la fase de extracción.
-
-    Para la primera prueba no vamos a introducir
-    una librería externa de ZIP todavía.
-
-    Lo importante es comprobar que Pages está
-    usando ESTE archivo y que el EXE se puede
-    cargar correctamente.
-*/
 
 extractButton.addEventListener(
     "click",
     async () =>
     {
         if (
-            !selectedBytes ||
+            !bytes ||
             !analysis
         )
         {
-            setStatus(
-                "❌ Primero analiza el EXE."
-            );
-
             return;
         }
 
         extractButton.disabled =
             true;
 
-        analyzeButton.disabled =
-            true;
-
-        setProgress(10);
-
         setStatus(
-            "🚀 Iniciando extracción real..."
+            "🚀 Extrayendo recursos reales..."
         );
 
         try
         {
-            /*
-                Detectamos firmas binarias reales.
-            */
-
-            const counts =
-                scanRealSignatures(
-                    selectedBytes
+            const extracted =
+                await extractAssets(
+                    bytes
                 );
 
-            setProgress(60);
+            setProgress(90);
 
-            /*
-                En esta etapa creamos un archivo
-                de diagnóstico descargable.
-            */
+            setStatus(
+                "📦 Construyendo MissaWeb.zip..."
+            );
 
-            const manifest =
-            {
-                version: VERSION,
-
-                original:
-                {
-                    name:
-                        selectedFile.name,
-
-                    size:
-                        selectedFile.size
-                },
-
-                engine:
-                {
-                    fnf:
-                        analysis.fnf,
-
-                    psychEngine:
-                        analysis.psych,
-
-                    haxe:
-                        analysis.haxe,
-
-                    haxeflixel:
-                        analysis.flixel,
-
-                    openfl:
-                        analysis.openfl,
-
-                    lime:
-                        analysis.lime
-                },
-
-                detectedResources:
-                    counts
-            };
-
-            setProgress(85);
-
-            const result =
-                await createDownload(
-                    manifest
+            const zip =
+                buildZip(
+                    extracted
                 );
+
+            const blob =
+                new Blob(
+                    [zip],
+                    {
+                        type:
+                            "application/zip"
+                    }
+                );
+
+            const url =
+                URL.createObjectURL(
+                    blob
+                );
+
+            const link =
+                document.createElement(
+                    "a"
+                );
+
+            link.href =
+                url;
+
+            link.download =
+                "MissaWeb.zip";
+
+            document.body.appendChild(
+                link
+            );
+
+            link.click();
+
+            link.remove();
 
             setProgress(100);
 
             setStatus(
-                "✅ PROCESO TERMINADO\n\n" +
-                "Se generó un paquete de prueba.\n\n" +
-                "La siguiente etapa será sustituir " +
-                "este paquete de diagnóstico por " +
-                "la extracción binaria completa."
+                "✅ TERMINADO\n\n" +
+                `Archivos extraídos: ${
+                    extracted.length
+                }\n\n` +
+                "MissaWeb.zip fue descargado."
             );
 
-            downloadBox.style.display =
-                "block";
-
-            downloadLink.href =
-                result.url;
-
-            downloadLink.download =
-                "MissaWeb.zip";
         }
-        catch (error)
+        catch(error)
         {
             console.error(error);
 
@@ -1502,232 +882,564 @@ extractButton.addEventListener(
         {
             extractButton.disabled =
                 false;
-
-            analyzeButton.disabled =
-                false;
         }
     }
 );
 
 
 /* ============================================================
-   FIRMAS REALES
+   PNG
 ============================================================ */
 
-function scanRealSignatures(bytes)
+function extractPNG(
+    bytes,
+    start
+)
 {
-    return {
-        png:
-            countSignature(
-                bytes,
-                [
-                    0x89,
-                    0x50,
-                    0x4E,
-                    0x47,
-                    0x0D,
-                    0x0A,
-                    0x1A,
-                    0x0A
-                ]
-            ),
+    const iend =
+        textBytes(
+            "IEND"
+        );
 
-        jpg:
-            countSignature(
-                bytes,
-                [
-                    0xFF,
-                    0xD8,
-                    0xFF
-                ]
-            ),
+    const end =
+        find(
+            bytes,
+            iend,
+            start + 8
+        );
 
-        ogg:
-            countSignature(
+    if(end === -1)
+        return null;
+
+    const finish =
+        end + 8;
+
+    return bytes.slice(
+        start,
+        finish
+    );
+}
+
+
+/* ============================================================
+   JPG
+============================================================ */
+
+function extractJPG(
+    bytes,
+    start
+)
+{
+    for(
+        let i = start + 3;
+        i + 1 < bytes.length;
+        i++
+    )
+    {
+        if(
+            bytes[i] === 0xFF &&
+            bytes[i + 1] === 0xD9
+        )
+        {
+            return bytes.slice(
+                start,
+                i + 2
+            );
+        }
+    }
+
+    return null;
+}
+
+
+/* ============================================================
+   WAV
+============================================================ */
+
+function extractWAV(
+    bytes,
+    start
+)
+{
+    if(
+        !signature(
+            bytes,
+            start,
+            textBytes("RIFF")
+        )
+    )
+    {
+        return null;
+    }
+
+    if(
+        !signature(
+            bytes,
+            start + 8,
+            textBytes("WAVE")
+        )
+    )
+    {
+        return null;
+    }
+
+    const size =
+        u32(
+            bytes,
+            start + 4
+        );
+
+    const end =
+        start +
+        8 +
+        size;
+
+    if(
+        end >
+        bytes.length
+    )
+    {
+        return null;
+    }
+
+    return bytes.slice(
+        start,
+        end
+    );
+}
+
+
+/* ============================================================
+   WEBP
+============================================================ */
+
+function extractWEBP(
+    bytes,
+    start
+)
+{
+    if(
+        !signature(
+            bytes,
+            start + 8,
+            textBytes("WEBP")
+        )
+    )
+    {
+        return null;
+    }
+
+    const size =
+        u32(
+            bytes,
+            start + 4
+        );
+
+    const end =
+        start +
+        8 +
+        size;
+
+    if(
+        end >
+        bytes.length
+    )
+    {
+        return null;
+    }
+
+    return bytes.slice(
+        start,
+        end
+    );
+}
+
+
+/* ============================================================
+   OGG
+============================================================ */
+
+function extractOGG(
+    bytes,
+    start
+)
+{
+    let pos =
+        start;
+
+    while(
+        pos + 27 <=
+        bytes.length
+    )
+    {
+        if(
+            !signature(
                 bytes,
+                pos,
                 [
                     0x4F,
                     0x67,
                     0x67,
                     0x53
                 ]
-            ),
-
-        zip:
-            countSignature(
-                bytes,
-                [
-                    0x50,
-                    0x4B,
-                    0x03,
-                    0x04
-                ]
-            ),
-
-        riff:
-            countSignature(
-                bytes,
-                [
-                    0x52,
-                    0x49,
-                    0x46,
-                    0x46
-                ]
             )
-    };
+        )
+        {
+            return null;
+        }
+
+        const headerType =
+            bytes[pos + 5];
+
+        const segments =
+            bytes[pos + 26];
+
+        const table =
+            pos + 27;
+
+        const payload =
+            table +
+            segments;
+
+        if(
+            payload >
+            bytes.length
+        )
+        {
+            return null;
+        }
+
+        let payloadSize =
+            0;
+
+        for(
+            let i = 0;
+            i < segments;
+            i++
+        )
+        {
+            payloadSize +=
+                bytes[
+                    table + i
+                ];
+        }
+
+        const pageEnd =
+            payload +
+            payloadSize;
+
+        if(
+            pageEnd >
+            bytes.length
+        )
+        {
+            return null;
+        }
+
+        if(
+            headerType & 0x04
+        )
+        {
+            return bytes.slice(
+                start,
+                pageEnd
+            );
+        }
+
+        pos =
+            pageEnd;
+    }
+
+    return null;
 }
 
 
-function countSignature(
-    bytes,
-    signature
-)
+/* ============================================================
+   EXTRACTOR
+============================================================ */
+
+async function extractAssets(bytes)
 {
-    let count = 0;
+    const output = [];
 
     let position = 0;
 
-    while (true)
+    const pngSig =
+    [
+        0x89,
+        0x50,
+        0x4E,
+        0x47,
+        0x0D,
+        0x0A,
+        0x1A,
+        0x0A
+    ];
+
+    const jpgSig =
+    [
+        0xFF,
+        0xD8,
+        0xFF
+    ];
+
+    const oggSig =
+    [
+        0x4F,
+        0x67,
+        0x67,
+        0x53
+    ];
+
+    const riffSig =
+    [
+        0x52,
+        0x49,
+        0x46,
+        0x46
+    ];
+
+    let images = 0;
+    let audio = 0;
+    let other = 0;
+
+
+    while(true)
     {
-        const found =
-            findSignature(
+        const p =
+            find(
                 bytes,
-                signature,
+                pngSig,
                 position
             );
 
-        if (found === -1)
-        {
+        if(p === -1)
             break;
+
+        const data =
+            extractPNG(
+                bytes,
+                p
+            );
+
+        if(data)
+        {
+            images++;
+
+            output.push(
+            {
+                path:
+                    `assets/images/image_${images}.png`,
+
+                data
+            });
+
+            position =
+                p +
+                data.length;
         }
-
-        count++;
-
-        position =
-            found +
-            signature.length;
+        else
+        {
+            position =
+                p + 8;
+        }
     }
 
-    return count;
-}
 
+    position = 0;
 
-/* ============================================================
-   DESCARGA DE DIAGNÓSTICO
-============================================================ */
+    while(true)
+    {
+        const p =
+            find(
+                bytes,
+                jpgSig,
+                position
+            );
 
-async function createDownload(
-    manifest
-)
-{
-    const text =
-        JSON.stringify(
-            manifest,
-            null,
-            4
-        );
+        if(p === -1)
+            break;
 
-    /*
-        Creamos un ZIP mínimo manualmente
-        sin depender de CDN.
+        const data =
+            extractJPG(
+                bytes,
+                p
+            );
 
-        En esta fase el ZIP contiene:
+        if(data)
+        {
+            images++;
 
-            manifest.json
-            README.txt
-
-        Esto demuestra que Pages puede generar
-        el archivo de salida localmente.
-
-        Después reemplazaremos esta función por
-        nuestro escritor ZIP completo con recursos.
-    */
-
-    const zip =
-        createSimpleZip(
-            [
-                {
-                    name:
-                        "manifest.json",
-
-                    data:
-                        new TextEncoder()
-                            .encode(text)
-                },
-
-                {
-                    name:
-                        "README.txt",
-
-                    data:
-                        new TextEncoder()
-                            .encode(
-`MISSA WEB
-=========
-
-Paquete generado por
-FNF Web Converter V4.
-
-El EXE fue analizado localmente.
-
-Esta versión todavía no reconstruye
-el runtime completo de Psych Engine.
-`
-                            )
-                }
-            ]
-        );
-
-    const blob =
-        new Blob(
-            [zip],
+            output.push(
             {
-                type:
-                    "application/zip"
+                path:
+                    `assets/images/image_${images}.jpg`,
+
+                data
+            });
+
+            position =
+                p +
+                data.length;
+        }
+        else
+        {
+            position =
+                p + 3;
+        }
+    }
+
+
+    position = 0;
+
+    while(true)
+    {
+        const p =
+            find(
+                bytes,
+                riffSig,
+                position
+            );
+
+        if(p === -1)
+            break;
+
+        let data = null;
+        let extension = null;
+
+        if(
+            signature(
+                bytes,
+                p + 8,
+                textBytes("WAVE")
+            )
+        )
+        {
+            data =
+                extractWAV(
+                    bytes,
+                    p
+                );
+
+            extension = "wav";
+        }
+        else if(
+            signature(
+                bytes,
+                p + 8,
+                textBytes("WEBP")
+            )
+        )
+        {
+            data =
+                extractWEBP(
+                    bytes,
+                    p
+                );
+
+            extension = "webp";
+        }
+
+        if(data)
+        {
+            images++;
+
+            output.push(
+            {
+                path:
+                    extension === "wav"
+                    ? `assets/audio/audio_${audio + 1}.wav`
+                    : `assets/images/image_${images}.webp`,
+
+                data
+            });
+
+            if(
+                extension === "wav"
+            )
+            {
+                audio++;
             }
-        );
 
-    const url =
-        URL.createObjectURL(
-            blob
-        );
+            position =
+                p +
+                data.length;
+        }
+        else
+        {
+            position =
+                p + 4;
+        }
+    }
 
-    return {
-        blob,
-        url
-    };
+
+    position = 0;
+
+    while(true)
+    {
+        const p =
+            find(
+                bytes,
+                oggSig,
+                position
+            );
+
+        if(p === -1)
+            break;
+
+        const data =
+            extractOGG(
+                bytes,
+                p
+            );
+
+        if(data)
+        {
+            audio++;
+
+            output.push(
+            {
+                path:
+                    `assets/audio/audio_${audio}.ogg`,
+
+                data
+            });
+
+            position =
+                p +
+                data.length;
+        }
+        else
+        {
+            position =
+                p + 4;
+        }
+    }
+
+
+    return output;
 }
 
 
 /* ============================================================
-   ZIP SIMPLE
+   ZIP STORE
 ============================================================ */
 
-/*
-    Escritor ZIP pequeño sin librerías externas.
-
-    Utiliza STORE:
-    compresión = 0.
-
-    Esto permite descargar archivos reales
-    desde GitHub Pages sin CDN.
-*/
-
-function crc32(bytes)
+function crc32(data)
 {
     let crc =
         0xFFFFFFFF;
 
-    for (
+    for(
         let i = 0;
-        i < bytes.length;
+        i < data.length;
         i++
     )
     {
         crc ^=
-            bytes[i];
+            data[i];
 
-        for (
+        for(
             let j = 0;
             j < 8;
             j++
@@ -1738,9 +1450,7 @@ function crc32(bytes)
                     crc >>> 1
                 ) ^
                 (
-                    (
-                        crc & 1
-                    )
+                    crc & 1
                         ? 0xEDB88320
                         : 0
                 );
@@ -1748,48 +1458,48 @@ function crc32(bytes)
     }
 
     return (
-        crc ^ 0xFFFFFFFF
+        crc ^
+        0xFFFFFFFF
     ) >>> 0;
 }
 
 
-function pushU16(
-    array,
+function push16(
+    arr,
     value
 )
 {
-    array.push(
-        value & 0xFF,
-        (value >>> 8) & 0xFF
+    arr.push(
+        value & 255,
+        (value >>> 8) & 255
     );
 }
 
 
-function pushU32(
-    array,
+function push32(
+    arr,
     value
 )
 {
-    array.push(
-        value & 0xFF,
-        (value >>> 8) & 0xFF,
-        (value >>> 16) & 0xFF,
-        (value >>> 24) & 0xFF
+    arr.push(
+        value & 255,
+        (value >>> 8) & 255,
+        (value >>> 16) & 255,
+        (value >>> 24) & 255
     );
 }
 
 
-function createSimpleZip(
+function makeZip(
     files
 )
 {
     const output = [];
-
     const central = [];
 
     let offset = 0;
 
-    for (
+    for(
         const file of files
     )
     {
@@ -1807,195 +1517,145 @@ function createSimpleZip(
                 data
             );
 
-        const local =
-            [];
+        const local = [];
 
-        /*
-            Local file header
-        */
-
-        pushU32(
+        push32(
             local,
             0x04034B50
         );
 
-        pushU16(
-            local,
-            20
-        );
+        push16(local,20);
+        push16(local,0);
+        push16(local,0);
+        push16(local,0);
+        push16(local,0);
 
-        pushU16(
-            local,
-            0
-        );
-
-        pushU16(
-            local,
-            0
-        );
-
-        pushU16(
-            local,
-            0
-        );
-
-        pushU16(
-            local,
-            0
-        );
-
-        pushU32(
+        push32(
             local,
             crc
         );
 
-        pushU32(
+        push32(
             local,
             data.length
         );
 
-        pushU32(
+        push32(
             local,
             data.length
         );
 
-        pushU16(
+        push16(
             local,
             name.length
         );
 
-        pushU16(
+        push16(
             local,
             0
         );
 
-        for (
-            const byte of name
+        for(
+            const b of name
         )
         {
-            local.push(byte);
+            local.push(b);
         }
 
-        for (
-            const byte of data
+        for(
+            const b of data
         )
         {
-            local.push(byte);
+            local.push(b);
         }
 
-        for (
-            const byte of local
+        for(
+            const b of local
         )
         {
-            output.push(
-                byte
-            );
+            output.push(b);
         }
 
-        /*
-            Central directory
-        */
 
-        const entry =
-            [];
+        const centralEntry = [];
 
-        pushU32(
-            entry,
+        push32(
+            centralEntry,
             0x02014B50
         );
 
-        pushU16(
-            entry,
-            20
-        );
+        push16(centralEntry,20);
+        push16(centralEntry,20);
+        push16(centralEntry,0);
+        push16(centralEntry,0);
+        push16(centralEntry,0);
+        push16(centralEntry,0);
 
-        pushU16(
-            entry,
-            20
-        );
-
-        pushU16(
-            entry,
-            0
-        );
-
-        pushU16(
-            entry,
-            0
-        );
-
-        pushU16(
-            entry,
-            0
-        );
-
-        pushU16(
-            entry,
-            0
-        );
-
-        pushU32(
-            entry,
+        push32(
+            centralEntry,
             crc
         );
 
-        pushU32(
-            entry,
+        push32(
+            centralEntry,
             data.length
         );
 
-        pushU32(
-            entry,
+        push32(
+            centralEntry,
             data.length
         );
 
-        pushU16(
-            entry,
+        push16(
+            centralEntry,
             name.length
         );
 
-        pushU16(
-            entry,
+        push16(
+            centralEntry,
             0
         );
 
-        pushU16(
-            entry,
+        push16(
+            centralEntry,
             0
         );
 
-        pushU16(
-            entry,
+        push16(
+            centralEntry,
             0
         );
 
-        pushU16(
-            entry,
+        push16(
+            centralEntry,
             0
         );
 
-        pushU32(
-            entry,
+        push32(
+            centralEntry,
             0
         );
 
-        pushU32(
-            entry,
+        push32(
+            centralEntry,
             offset
         );
 
-        for (
-            const byte of name
+        for(
+            const b of name
         )
         {
-            entry.push(byte);
+            centralEntry.push(b);
         }
 
-        central.push(entry);
+        central.push(
+            centralEntry
+        );
 
         offset +=
             local.length;
     }
+
 
     const centralOffset =
         output.length;
@@ -2003,66 +1663,47 @@ function createSimpleZip(
     let centralSize =
         0;
 
-    for (
+    for(
         const entry of central
     )
     {
-        for (
-            const byte of entry
+        for(
+            const b of entry
         )
         {
-            output.push(
-                byte
-            );
+            output.push(b);
         }
 
         centralSize +=
             entry.length;
     }
 
-    /*
-        End of central directory
-    */
 
-    pushU32(
+    push32(
         output,
         0x06054B50
     );
 
-    pushU16(
-        output,
-        0
-    );
+    push16(output,0);
+    push16(output,0);
+    push16(output,files.length);
+    push16(output,files.length);
 
-    pushU16(
-        output,
-        0
-    );
-
-    pushU16(
-        output,
-        files.length
-    );
-
-    pushU16(
-        output,
-        files.length
-    );
-
-    pushU32(
+    push32(
         output,
         centralSize
     );
 
-    pushU32(
+    push32(
         output,
         centralOffset
     );
 
-    pushU16(
+    push16(
         output,
         0
     );
+
 
     return new Uint8Array(
         output
@@ -2071,15 +1712,120 @@ function createSimpleZip(
 
 
 /* ============================================================
-   ARRANQUE
+   CONSTRUIR ZIP
 ============================================================ */
 
-console.log(
-    `FNF Web Converter ${VERSION} cargado.`
-);
+function buildZip(
+    extracted
+)
+{
+    const files = [];
 
-setStatus(
-    "✅ FNF Web Converter V4 cargado.\n\n" +
-    "Esta página ya es la versión nueva.\n" +
-    "Selecciona un EXE para comenzar."
-);
+
+    files.push(
+    {
+        name:
+            "index.html",
+
+        data:
+            new TextEncoder()
+                .encode(
+`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Missa V3 Web</title>
+</head>
+<body>
+<h1>MISSA V3 WEB</h1>
+<p>Proyecto generado desde un EXE de FNF.</p>
+<p>Los recursos extraídos están en assets/.</p>
+</body>
+</html>`
+                )
+    });
+
+
+    files.push(
+    {
+        name:
+            "README.txt",
+
+        data:
+            new TextEncoder()
+                .encode(
+`MISSA V3 WEB
+
+Los archivos de assets incluidos en este
+proyecto fueron extraídos mediante firmas
+binarias reales desde el EXE.
+
+Esto NO significa que el código compilado
+del Psych Engine haya sido convertido.
+
+El siguiente paso es interpretar los datos
+y reconstruir el runtime FNF para navegador.
+`
+                )
+    });
+
+
+    files.push(
+    {
+        name:
+            "manifest.json",
+
+        data:
+            new TextEncoder()
+                .encode(
+                    JSON.stringify(
+                    {
+                        original:
+                            file.name,
+
+                        engine:
+                            "Psych Engine / HaxeFlixel",
+
+                        extracted:
+                            extracted.map(
+                                item =>
+                                ({
+                                    path:
+                                        item.path,
+
+                                    size:
+                                        item.data.length
+                                })
+                            )
+                    },
+                    null,
+                    4
+                    )
+                )
+    });
+
+
+    for(
+        const item of extracted
+    )
+    {
+        files.push(
+        {
+            name:
+                item.path,
+
+            data:
+                item.data
+        });
+    }
+
+
+    return makeZip(
+        files
+    );
+}
+
+</script>
+
+</body>
+</html>
