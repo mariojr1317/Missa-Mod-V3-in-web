@@ -1,73 +1,181 @@
+```javascript
 "use strict";
 
 /*
 ============================================================
- FNF WEB CONVERTER V6
+ FNF WEB CONVERTER V7
 
- OBJETIVO
+ Detecta y extrae contenedores multimedia:
 
- EXE
-  ↓
- extracción real
-  ↓
- PNG / JPG / WEBP / WAV / OGG
-  ↓
- JSON reales
-  ↓
- detección de charts Psych Engine
-  ↓
- ZIP
-  ↓
- navegador
-  ↓
- selector de chart + audio
-  ↓
- gameplay FNF básico
+ IMÁGENES
+   PNG
+   JPG/JPEG
+   WEBP
 
- Esta versión NO convierte el código Haxe compilado.
- Convierte/recupera los datos que podamos identificar.
+ AUDIO
+   OGG
+   MP3
+   WAV
+
+ VIDEO
+   MP4
+   WEBM
+
+ DATOS
+   JSON
+   LUA
+   TXT
+
+ ARCHIVOS
+   ZIP
+
+ También intenta detectar:
+   FNF
+   Psych Engine
+   HaxeFlixel
+
+ Y charts JSON con:
+   song.notes
+   sectionNotes
+   bpm
+   speed
+
+ IMPORTANTE:
+ El EXE se procesa localmente.
+ No se sube a ningún servidor.
 ============================================================
 */
 
-const fileInput = document.getElementById("file");
-const drop = document.getElementById("drop");
-const analyzeButton = document.getElementById("analyze");
-const extractButton = document.getElementById("extract");
-const status = document.getElementById("status");
-const results = document.getElementById("results");
-const bar = document.getElementById("bar");
+const fileInput =
+    document.getElementById(
+        "fileInput"
+    );
+
+const dropZone =
+    document.getElementById(
+        "dropZone"
+    );
+
+const analyzeButton =
+    document.getElementById(
+        "analyzeButton"
+    );
+
+const extractButton =
+    document.getElementById(
+        "extractButton"
+    );
+
+const status =
+    document.getElementById(
+        "status"
+    );
+
+const results =
+    document.getElementById(
+        "results"
+    );
+
+const progressBar =
+    document.getElementById(
+        "progressBar"
+    );
+
 
 let selectedFile = null;
-let selectedBytes = null;
+let bytes = null;
 let analysis = null;
 
 
 /* ============================================================
-   UTILIDADES
+ UI
 ============================================================ */
 
-function setStatus(text) {
+function setStatus(text)
+{
     status.textContent = text;
 }
 
-function progress(value) {
-    bar.style.width = `${Math.max(0, Math.min(100, value))}%`;
+
+function setProgress(value)
+{
+    progressBar.style.width =
+        `${Math.max(
+            0,
+            Math.min(
+                100,
+                value
+            )
+        )}%`;
 }
 
-function textBytes(text) {
+
+function formatBytes(value)
+{
+    if (value < 1024)
+        return `${value} B`;
+
+    if (value < 1024 * 1024)
+        return `${
+            (value / 1024).toFixed(2)
+        } KB`;
+
+    if (value < 1024 * 1024 * 1024)
+        return `${
+            (
+                value /
+                1024 /
+                1024
+            ).toFixed(2)
+        } MB`;
+
+    return `${
+        (
+            value /
+            1024 /
+            1024 /
+            1024
+        ).toFixed(2)
+    } GB`;
+}
+
+
+function ascii(text)
+{
     return Uint8Array.from(
-        [...text].map(c => c.charCodeAt(0))
+        [...text].map(
+            c => c.charCodeAt(0)
+        )
     );
 }
 
-function hasSignature(bytes, offset, signature) {
 
-    if (offset + signature.length > bytes.length) {
+function hasSignature(
+    data,
+    offset,
+    signature
+)
+{
+    if (
+        offset +
+        signature.length >
+        data.length
+    )
+    {
         return false;
     }
 
-    for (let i = 0; i < signature.length; i++) {
-        if (bytes[offset + i] !== signature[i]) {
+    for (
+        let i = 0;
+        i < signature.length;
+        i++
+    )
+    {
+        if (
+            data[offset + i] !==
+            signature[i]
+        )
+        {
             return false;
         }
     }
@@ -75,14 +183,29 @@ function hasSignature(bytes, offset, signature) {
     return true;
 }
 
-function findSignature(bytes, signature, start = 0, end = bytes.length) {
 
-    const limit =
-        Math.min(end, bytes.length) -
-        signature.length;
-
-    for (let i = start; i <= limit; i++) {
-        if (hasSignature(bytes, i, signature)) {
+function findSignature(
+    data,
+    signature,
+    start = 0
+)
+{
+    for (
+        let i = start;
+        i +
+            signature.length <=
+            data.length;
+        i++
+    )
+    {
+        if (
+            hasSignature(
+                data,
+                i,
+                signature
+            )
+        )
+        {
             return i;
         }
     }
@@ -90,209 +213,256 @@ function findSignature(bytes, signature, start = 0, end = bytes.length) {
     return -1;
 }
 
-function findText(bytes, text, start = 0, end = bytes.length) {
-    return findSignature(
-        bytes,
-        textBytes(text),
-        start,
-        end
-    );
-}
 
-function readU16LE(bytes, offset) {
-
-    if (offset + 2 > bytes.length) {
+function readU16LE(
+    data,
+    offset
+)
+{
+    if (
+        offset + 2 >
+        data.length
+    )
+    {
         return 0;
     }
 
     return (
-        bytes[offset] |
-        (bytes[offset + 1] << 8)
+        data[offset] |
+        (
+            data[offset + 1]
+            << 8
+        )
     ) & 0xFFFF;
 }
 
-function readU32LE(bytes, offset) {
 
-    if (offset + 4 > bytes.length) {
+function readU32LE(
+    data,
+    offset
+)
+{
+    if (
+        offset + 4 >
+        data.length
+    )
+    {
         return 0;
     }
 
     return (
-        bytes[offset] |
-        (bytes[offset + 1] << 8) |
-        (bytes[offset + 2] << 16) |
-        (bytes[offset + 3] << 24)
+        data[offset] |
+        (
+            data[offset + 1]
+            << 8
+        ) |
+        (
+            data[offset + 2]
+            << 16
+        ) |
+        (
+            data[offset + 3]
+            << 24
+        )
     ) >>> 0;
 }
 
-function formatBytes(value) {
 
-    if (value < 1024) {
-        return `${value} B`;
-    }
-
-    if (value < 1024 * 1024) {
-        return `${(value / 1024).toFixed(2)} KB`;
-    }
-
-    if (value < 1024 * 1024 * 1024) {
-        return `${(
-            value /
-            1024 /
-            1024
-        ).toFixed(2)} MB`;
-    }
-
-    return `${(
-        value /
-        1024 /
-        1024 /
-        1024
-    ).toFixed(2)} GB`;
-}
-
-function safeFilename(name) {
-
+function safeName(name)
+{
     return name
-        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
-        .replace(/\s+/g, "_")
-        .slice(0, 180);
+        .replace(
+            /[<>:"/\\|?*\x00-\x1F]/g,
+            "_"
+        )
+        .replace(
+            /\s+/g,
+            "_"
+        )
+        .slice(
+            0,
+            160
+        );
 }
 
 
 /* ============================================================
-   ARCHIVO
+ ARCHIVO
 ============================================================ */
 
-drop.addEventListener("click", () => {
-    fileInput.click();
-});
+dropZone.addEventListener(
+    "click",
+    () => fileInput.click()
+);
 
-fileInput.addEventListener("change", () => {
 
-    if (!fileInput.files.length) {
-        return;
+fileInput.addEventListener(
+    "change",
+    () =>
+    {
+        if (
+            fileInput.files.length
+        )
+        {
+            selectFile(
+                fileInput.files[0]
+            );
+        }
     }
+);
 
-    selectFile(fileInput.files[0]);
-});
 
-drop.addEventListener("dragover", event => {
+dropZone.addEventListener(
+    "dragover",
+    event =>
+    {
+        event.preventDefault();
 
-    event.preventDefault();
-
-    drop.classList.add("drag");
-});
-
-drop.addEventListener("dragleave", () => {
-
-    drop.classList.remove("drag");
-});
-
-drop.addEventListener("drop", event => {
-
-    event.preventDefault();
-
-    drop.classList.remove("drag");
-
-    if (!event.dataTransfer.files.length) {
-        return;
+        dropZone.classList.add(
+            "dragging"
+        );
     }
+);
 
-    selectFile(
-        event.dataTransfer.files[0]
-    );
-});
 
-function selectFile(file) {
+dropZone.addEventListener(
+    "dragleave",
+    () =>
+    {
+        dropZone.classList.remove(
+            "dragging"
+        );
+    }
+);
 
+
+dropZone.addEventListener(
+    "drop",
+    event =>
+    {
+        event.preventDefault();
+
+        dropZone.classList.remove(
+            "dragging"
+        );
+
+        if (
+            event.dataTransfer.files.length
+        )
+        {
+            selectFile(
+                event.dataTransfer.files[0]
+            );
+        }
+    }
+);
+
+
+function selectFile(file)
+{
     selectedFile = file;
-    selectedBytes = null;
+
+    bytes = null;
+
     analysis = null;
 
-    analyzeButton.disabled = false;
-    extractButton.disabled = true;
+    analyzeButton.disabled =
+        false;
 
-    results.innerHTML = "";
+    extractButton.disabled =
+        true;
+
+    results.innerHTML =
+        "";
+
+    setProgress(0);
 
     setStatus(
-        "📦 Archivo seleccionado\n\n" +
-        `Nombre: ${file.name}\n` +
-        `Tamaño: ${formatBytes(file.size)}\n\n` +
-        "Pulsa ANALIZAR."
+        `📦 ${file.name}\n\n` +
+        `Tamaño: ${
+            formatBytes(file.size)
+        }\n\n` +
+        `Pulsa ANALIZAR.`
     );
-
-    progress(0);
 }
 
 
 /* ============================================================
-   PE
+ PE
 ============================================================ */
 
-function analyzePE(bytes) {
-
-    const result = {
+function analyzePE(data)
+{
+    const result =
+    {
         valid: false,
-        machine: "Unknown",
-        peOffset: null
+        machine: "Unknown"
     };
 
     if (
-        bytes.length < 64 ||
-        bytes[0] !== 0x4D ||
-        bytes[1] !== 0x5A
-    ) {
+        data.length < 64 ||
+        data[0] !== 0x4D ||
+        data[1] !== 0x5A
+    )
+    {
         return result;
     }
 
     const peOffset =
-        readU32LE(bytes, 0x3C);
+        readU32LE(
+            data,
+            0x3C
+        );
 
-    if (peOffset + 24 > bytes.length) {
+    if (
+        peOffset + 24 >
+        data.length
+    )
+    {
         return result;
     }
 
     if (
         !hasSignature(
-            bytes,
+            data,
             peOffset,
-            [0x50, 0x45, 0x00, 0x00]
+            [0x50,0x45,0x00,0x00]
         )
-    ) {
+    )
+    {
         return result;
     }
 
     result.valid = true;
-    result.peOffset = peOffset;
 
     const machine =
         readU16LE(
-            bytes,
+            data,
             peOffset + 4
         );
 
-    switch (machine) {
-
+    switch (machine)
+    {
         case 0x014C:
-            result.machine = "x86 (32-bit)";
+            result.machine =
+                "x86 (32-bit)";
             break;
 
         case 0x8664:
-            result.machine = "x64 (64-bit)";
+            result.machine =
+                "x64 (64-bit)";
             break;
 
         case 0xAA64:
-            result.machine = "ARM64";
-            break;
-
-        case 0x01C4:
-            result.machine = "ARM";
+            result.machine =
+                "ARM64";
             break;
 
         default:
             result.machine =
-                `Unknown (0x${machine.toString(16)})`;
+                `Unknown (0x${
+                    machine.toString(16)
+                })`;
     }
 
     return result;
@@ -300,34 +470,68 @@ function analyzePE(bytes) {
 
 
 /* ============================================================
-   MOTOR
+ MOTOR
 ============================================================ */
 
-function detectEngine(bytes) {
-
+function detectEngine(data)
+{
     const fnf =
-        findText(bytes, "Friday Night Funkin") !== -1 ||
-        findText(bytes, "funkin") !== -1 ||
-        findText(bytes, "FNF") !== -1;
+        findSignature(
+            data,
+            ascii(
+                "Friday Night Funkin"
+            )
+        ) !== -1 ||
+        findSignature(
+            data,
+            ascii("funkin")
+        ) !== -1;
 
     const psych =
-        findText(bytes, "Psych Engine") !== -1 ||
-        findText(bytes, "PsychEngine") !== -1;
-
-    const haxe =
-        findText(bytes, "Haxe") !== -1;
+        findSignature(
+            data,
+            ascii("Psych Engine")
+        ) !== -1 ||
+        findSignature(
+            data,
+            ascii("PsychEngine")
+        ) !== -1;
 
     const flixel =
-        findText(bytes, "HaxeFlixel") !== -1 ||
-        findText(bytes, "flixel") !== -1;
+        findSignature(
+            data,
+            ascii("HaxeFlixel")
+        ) !== -1 ||
+        findSignature(
+            data,
+            ascii("flixel")
+        ) !== -1;
+
+    const haxe =
+        findSignature(
+            data,
+            ascii("Haxe")
+        ) !== -1;
 
     const openfl =
-        findText(bytes, "OpenFL") !== -1 ||
-        findText(bytes, "openfl") !== -1;
+        findSignature(
+            data,
+            ascii("OpenFL")
+        ) !== -1 ||
+        findSignature(
+            data,
+            ascii("openfl")
+        ) !== -1;
 
     const lime =
-        findText(bytes, "Lime") !== -1 ||
-        findText(bytes, "lime") !== -1;
+        findSignature(
+            data,
+            ascii("Lime")
+        ) !== -1 ||
+        findSignature(
+            data,
+            ascii("lime")
+        ) !== -1;
 
     return {
         fnf,
@@ -341,35 +545,34 @@ function detectEngine(bytes) {
 
 
 /* ============================================================
-   FIRMAS
+ FIRMAS
 ============================================================ */
 
-function countSignature(bytes, signature) {
-
+function countSignature(
+    data,
+    signature
+)
+{
     let count = 0;
     let position = 0;
 
-    while (true) {
-
+    while (true)
+    {
         const found =
             findSignature(
-                bytes,
+                data,
                 signature,
                 position
             );
 
-        if (found === -1) {
+        if (found === -1)
             break;
-        }
 
         count++;
 
         position =
             found +
-            Math.max(
-                1,
-                signature.length
-            );
+            signature.length;
     }
 
     return count;
@@ -377,126 +580,176 @@ function countSignature(bytes, signature) {
 
 
 /* ============================================================
-   ANÁLISIS
+ ANÁLISIS
 ============================================================ */
 
-function analyzeGame(bytes) {
-
+function analyzeGame(data)
+{
     const pe =
-        analyzePE(bytes);
+        analyzePE(data);
 
     const engine =
-        detectEngine(bytes);
+        detectEngine(data);
 
-    const png =
-        countSignature(
-            bytes,
-            [
-                0x89,
-                0x50,
-                0x4E,
-                0x47,
-                0x0D,
-                0x0A,
-                0x1A,
-                0x0A
-            ]
-        );
+    const resources =
+    {
+        png:
+            countSignature(
+                data,
+                [
+                    0x89,
+                    0x50,
+                    0x4E,
+                    0x47,
+                    0x0D,
+                    0x0A,
+                    0x1A,
+                    0x0A
+                ]
+            ),
 
-    const jpg =
-        countSignature(
-            bytes,
-            [
-                0xFF,
-                0xD8,
-                0xFF
-            ]
-        );
+        jpg:
+            countSignature(
+                data,
+                [
+                    0xFF,
+                    0xD8,
+                    0xFF
+                ]
+            ),
 
-    const ogg =
-        countSignature(
-            bytes,
-            [
-                0x4F,
-                0x67,
-                0x67,
-                0x53
-            ]
-        );
+        ogg:
+            countSignature(
+                data,
+                [
+                    0x4F,
+                    0x67,
+                    0x67,
+                    0x53
+                ]
+            ),
 
-    const riff =
-        countSignature(
-            bytes,
-            [
-                0x52,
-                0x49,
-                0x46,
-                0x46
-            ]
-        );
+        mp3:
+            countSignature(
+                data,
+                [
+                    0x49,
+                    0x44,
+                    0x33
+                ]
+            ),
 
-    const zip =
-        countSignature(
-            bytes,
-            [
-                0x50,
-                0x4B,
-                0x03,
-                0x04
-            ]
-        );
+        riff:
+            countSignature(
+                data,
+                ascii("RIFF")
+            ),
+
+        mp4:
+            countSignature(
+                data,
+                ascii("ftyp")
+            ),
+
+        webm:
+            countSignature(
+                data,
+                ascii("webm")
+            ),
+
+        zip:
+            countSignature(
+                data,
+                [
+                    0x50,
+                    0x4B,
+                    0x03,
+                    0x04
+                ]
+            )
+    };
 
     let score = 0;
 
-    if (pe.valid) score += 10;
-    if (engine.fnf) score += 25;
-    if (engine.psych) score += 35;
-    if (engine.flixel) score += 15;
-    if (ogg > 0) score += 5;
-    if (png > 0) score += 5;
-    if (riff > 0) score += 5;
+    if (pe.valid)
+        score += 10;
+
+    if (engine.fnf)
+        score += 25;
+
+    if (engine.psych)
+        score += 35;
+
+    if (engine.flixel)
+        score += 15;
+
+    if (resources.ogg)
+        score += 5;
+
+    if (resources.mp3)
+        score += 5;
+
+    if (resources.png)
+        score += 5;
 
     score =
-        Math.min(100, score);
+        Math.min(
+            100,
+            score
+        );
 
     return {
         pe,
         engine,
-
-        resources: {
-            png,
-            jpg,
-            ogg,
-            riff,
-            zip
-        },
-
+        resources,
         score
     };
 }
 
 
 /* ============================================================
-   RESULTADOS
+ RESULTADOS
 ============================================================ */
 
-function addResult(title, value, good = true) {
+function addResult(
+    title,
+    value,
+    good = true
+)
+{
+    const div =
+        document.createElement(
+            "div"
+        );
 
-    const element =
-        document.createElement("div");
+    div.className =
+        `result ${
+            good
+                ? "good"
+                : "warn"
+        }`;
 
-    element.className =
-        `result ${good ? "good" : "warn"}`;
+    div.innerHTML =
+        `
+        <div class="result-title">
+            ${title}
+        </div>
 
-    element.innerHTML =
-        `<strong>${title}</strong><br>${value}`;
+        <div class="result-value">
+            ${value}
+        </div>
+        `;
 
-    results.appendChild(element);
+    results.appendChild(
+        div
+    );
 }
 
-function displayAnalysis() {
 
-    results.innerHTML = "";
+function displayAnalysis()
+{
+    results.innerHTML =
+        "";
 
     addResult(
         "PE",
@@ -512,7 +765,7 @@ function displayAnalysis() {
     );
 
     addResult(
-        "Friday Night Funkin'",
+        "FNF",
         analysis.engine.fnf
             ? "✅ Detectado"
             : "⚠️ No confirmado",
@@ -536,12 +789,12 @@ function displayAnalysis() {
     );
 
     addResult(
-        "PNG binarios",
+        "PNG",
         analysis.resources.png
     );
 
     addResult(
-        "JPEG binarios",
+        "JPG/JPEG",
         analysis.resources.jpg
     );
 
@@ -551,8 +804,23 @@ function displayAnalysis() {
     );
 
     addResult(
-        "RIFF/WAV",
+        "MP3",
+        analysis.resources.mp3
+    );
+
+    addResult(
+        "RIFF/WAV/WEBP",
         analysis.resources.riff
+    );
+
+    addResult(
+        "MP4/FTYP",
+        analysis.resources.mp4
+    );
+
+    addResult(
+        "WEBM",
+        analysis.resources.webm
     );
 
     addResult(
@@ -568,22 +836,24 @@ function displayAnalysis() {
 
 
 /* ============================================================
-   ANALIZAR
+ ANALIZAR
 ============================================================ */
 
 analyzeButton.addEventListener(
     "click",
-    async () => {
-
-        if (!selectedFile) {
+    async () =>
+    {
+        if (!selectedFile)
             return;
-        }
 
-        analyzeButton.disabled = true;
-        extractButton.disabled = true;
+        analyzeButton.disabled =
+            true;
 
-        try {
+        extractButton.disabled =
+            true;
 
+        try
+        {
             setStatus(
                 "📥 Cargando EXE..."
             );
@@ -591,29 +861,19 @@ analyzeButton.addEventListener(
             const buffer =
                 await selectedFile.arrayBuffer();
 
-            selectedBytes =
-                new Uint8Array(buffer);
+            bytes =
+                new Uint8Array(
+                    buffer
+                );
 
-            progress(20);
-
-            setStatus(
-                "🔎 Analizando PE..."
-            );
-
-            await new Promise(
-                resolve =>
-                    setTimeout(
-                        resolve,
-                        20
-                    )
-            );
+            setProgress(20);
 
             analysis =
                 analyzeGame(
-                    selectedBytes
+                    bytes
                 );
 
-            progress(100);
+            setProgress(100);
 
             displayAnalysis();
 
@@ -622,9 +882,11 @@ analyzeButton.addEventListener(
 
             setStatus(
                 "✅ Análisis terminado.\n\n" +
-                `Tamaño: ${formatBytes(
-                    selectedBytes.length
-                )}\n` +
+                `Tamaño: ${
+                    formatBytes(
+                        bytes.length
+                    )
+                }\n` +
                 `Arquitectura: ${
                     analysis.pe.machine
                 }\n` +
@@ -632,19 +894,17 @@ analyzeButton.addEventListener(
                     analysis.score
                 }/100`
             );
-
         }
-        catch (error) {
-
+        catch(error)
+        {
             console.error(error);
 
             setStatus(
-                "❌ Error:\n\n" +
-                error.message
+                `❌ ${error.message}`
             );
         }
-        finally {
-
+        finally
+        {
             analyzeButton.disabled =
                 false;
         }
@@ -653,60 +913,58 @@ analyzeButton.addEventListener(
 
 
 /* ============================================================
-   EXTRAER PNG
+ PNG
 ============================================================ */
 
-function extractPNG(bytes, start) {
+function extractPNG(
+    data,
+    start
+)
+{
+    const endMarker =
+        ascii("IEND");
 
-    const iend =
-        textBytes("IEND");
-
-    const end =
+    const marker =
         findSignature(
-            bytes,
-            iend,
+            data,
+            endMarker,
             start + 8
         );
 
-    if (end === -1) {
+    if (marker === -1)
         return null;
-    }
 
-    const finish =
-        end + 8;
+    const end =
+        marker + 8;
 
-    if (
-        finish <= start ||
-        finish > bytes.length
-    ) {
-        return null;
-    }
-
-    return bytes.slice(
+    return data.slice(
         start,
-        finish
+        end
     );
 }
 
 
 /* ============================================================
-   EXTRAER JPG
+ JPEG
 ============================================================ */
 
-function extractJPG(bytes, start) {
-
+function extractJPG(
+    data,
+    start
+)
+{
     for (
         let i = start + 3;
-        i + 1 < bytes.length;
+        i + 1 < data.length;
         i++
-    ) {
-
+    )
+    {
         if (
-            bytes[i] === 0xFF &&
-            bytes[i + 1] === 0xD9
-        ) {
-
-            return bytes.slice(
+            data[i] === 0xFF &&
+            data[i + 1] === 0xD9
+        )
+        {
+            return data.slice(
                 start,
                 i + 2
             );
@@ -718,77 +976,234 @@ function extractJPG(bytes, start) {
 
 
 /* ============================================================
-   WAV / WEBP
+ RIFF
 ============================================================ */
 
 function extractRIFF(
-    bytes,
+    data,
     start,
-    subtype
-) {
-
+    type
+)
+{
     if (
         !hasSignature(
-            bytes,
+            data,
             start,
-            textBytes("RIFF")
+            ascii("RIFF")
         )
-    ) {
+    )
+    {
         return null;
     }
 
     if (
         !hasSignature(
-            bytes,
+            data,
             start + 8,
-            textBytes(subtype)
+            ascii(type)
         )
-    ) {
+    )
+    {
         return null;
     }
 
     const size =
         readU32LE(
-            bytes,
+            data,
             start + 4
         );
 
-    const finish =
+    const end =
         start +
         8 +
         size;
 
     if (
-        finish > bytes.length ||
-        finish <= start
-    ) {
+        end > data.length
+    )
+    {
         return null;
     }
 
-    return bytes.slice(
+    return data.slice(
         start,
-        finish
+        end
     );
 }
 
 
 /* ============================================================
-   OGG
+ MP3
+
+ Soporta:
+   ID3
+
+ y MPEG frames básicos.
 ============================================================ */
 
-function extractOGG(bytes, start) {
+function extractMP3(
+    data,
+    start
+)
+{
+    if (
+        hasSignature(
+            data,
+            start,
+            ascii("ID3")
+        )
+    )
+    {
+        if (
+            start + 10 >
+            data.length
+        )
+        {
+            return null;
+        }
 
+        const sizeBytes =
+            data.slice(
+                start + 6,
+                start + 10
+            );
+
+        const size =
+            (
+                ((sizeBytes[0] & 0x7F) << 21) |
+                ((sizeBytes[1] & 0x7F) << 14) |
+                ((sizeBytes[2] & 0x7F) << 7) |
+                (sizeBytes[3] & 0x7F)
+            );
+
+        const end =
+            start +
+            10 +
+            size;
+
+        /*
+          ID3 no necesariamente contiene TODO
+          el MP3. Por eso seguimos buscando frames.
+        */
+
+        if (
+            end <= data.length
+        )
+        {
+            let pos = end;
+
+            while (
+                pos + 4 <=
+                data.length
+            )
+            {
+                if (
+                    data[pos] === 0xFF &&
+                    (data[pos + 1] & 0xE0) === 0xE0
+                )
+                {
+                    pos += 2;
+                }
+                else
+                {
+                    break;
+                }
+
+                if (
+                    pos > start &&
+                    pos - start >
+                    256 * 1024 * 1024
+                )
+                {
+                    break;
+                }
+            }
+
+            /*
+              Como un MP3 no tiene un final simple universal,
+              usamos el siguiente contenedor conocido si existe.
+            */
+
+            const nextPNG =
+                findSignature(
+                    data,
+                    [
+                        0x89,
+                        0x50,
+                        0x4E,
+                        0x47
+                    ],
+                    end
+                );
+
+            const nextOgg =
+                findSignature(
+                    data,
+                    [
+                        0x4F,
+                        0x67,
+                        0x67,
+                        0x53
+                    ],
+                    end
+                );
+
+            let finish =
+                data.length;
+
+            if (
+                nextPNG !== -1
+            )
+            {
+                finish =
+                    Math.min(
+                        finish,
+                        nextPNG
+                    );
+            }
+
+            if (
+                nextOgg !== -1
+            )
+            {
+                finish =
+                    Math.min(
+                        finish,
+                        nextOgg
+                    );
+            }
+
+            return data.slice(
+                start,
+                finish
+            );
+        }
+    }
+
+    return null;
+}
+
+
+/* ============================================================
+ OGG
+============================================================ */
+
+function extractOGG(
+    data,
+    start
+)
+{
     let position =
         start;
 
     while (
         position + 27 <=
-        bytes.length
-    ) {
-
+        data.length
+    )
+    {
         if (
             !hasSignature(
-                bytes,
+                data,
                 position,
                 [
                     0x4F,
@@ -797,15 +1212,16 @@ function extractOGG(bytes, start) {
                     0x53
                 ]
             )
-        ) {
+        )
+        {
             return null;
         }
 
         const headerType =
-            bytes[position + 5];
+            data[position + 5];
 
         const segments =
-            bytes[position + 26];
+            data[position + 26];
 
         const table =
             position + 27;
@@ -816,20 +1232,23 @@ function extractOGG(bytes, start) {
 
         if (
             payload >
-            bytes.length
-        ) {
+            data.length
+        )
+        {
             return null;
         }
 
-        let payloadSize = 0;
+        let payloadSize =
+            0;
 
         for (
             let i = 0;
             i < segments;
             i++
-        ) {
+        )
+        {
             payloadSize +=
-                bytes[
+                data[
                     table + i
                 ];
         }
@@ -840,15 +1259,17 @@ function extractOGG(bytes, start) {
 
         if (
             pageEnd >
-            bytes.length
-        ) {
+            data.length
+        )
+        {
             return null;
         }
 
         if (
             headerType & 0x04
-        ) {
-            return bytes.slice(
+        )
+        {
+            return data.slice(
                 start,
                 pageEnd
             );
@@ -863,100 +1284,298 @@ function extractOGG(bytes, start) {
 
 
 /* ============================================================
-   JSON DETECTION
+ MP4
+
+ Busca ftyp y calcula boxes ISO-BMFF.
 ============================================================ */
 
-/*
-    Lee un objeto JSON completo empezando en "{"
-    respetando strings y escapes.
-
-    Esto evita muchos falsos positivos.
-*/
-
-function extractJSONAt(
-    bytes,
-    start,
-    maxSize = 8 * 1024 * 1024
-) {
+function extractMP4(
+    data,
+    ftyp
+)
+{
+    let boxStart =
+        ftyp - 4;
 
     if (
-        bytes[start] !== 0x7B
-    ) {
+        boxStart < 0
+    )
+    {
         return null;
     }
 
-    const endLimit =
+    let lastValid =
+        boxStart;
+
+    while (
+        boxStart + 8 <=
+        data.length
+    )
+    {
+        const size =
+            readU32BE(
+                data,
+                boxStart
+            );
+
+        if (
+            size === 0
+        )
+        {
+            break;
+        }
+
+        if (
+            size === 1
+        )
+        {
+            /*
+              64-bit larges no se manejan en
+              esta versión.
+            */
+            break;
+        }
+
+        if (
+            size < 8 ||
+            boxStart + size >
+            data.length
+        )
+        {
+            break;
+        }
+
+        lastValid =
+            boxStart +
+            size;
+
+        boxStart =
+            lastValid;
+    }
+
+    if (
+        lastValid <= ftyp
+    )
+    {
+        return null;
+    }
+
+    return {
+        start:
+            ftyp - 4,
+
+        end:
+            lastValid,
+
+        data:
+            data.slice(
+                ftyp - 4,
+                lastValid
+            )
+    };
+}
+
+
+function readU32BE(
+    data,
+    offset
+)
+{
+    if (
+        offset + 4 >
+        data.length
+    )
+    {
+        return 0;
+    }
+
+    return (
+        (
+            data[offset]
+            << 24
+        ) >>> 0
+    ) |
+    (
+        data[offset + 1]
+        << 16
+    ) |
+    (
+        data[offset + 2]
+        << 8
+    ) |
+    data[offset + 3];
+}
+
+
+/* ============================================================
+ WEBM
+
+ Matroska usa EBML.
+ Esta función detecta el contenedor y
+ busca una siguiente firma conocida para
+ determinar un límite aproximado.
+
+============================================================ */
+
+function extractWebM(
+    data,
+    start
+)
+{
+    const nextPNG =
+        findSignature(
+            data,
+            [
+                0x89,
+                0x50,
+                0x4E,
+                0x47
+            ],
+            start + 4
+        );
+
+    const nextOgg =
+        findSignature(
+            data,
+            [
+                0x4F,
+                0x67,
+                0x67,
+                0x53
+            ],
+            start + 4
+        );
+
+    let end =
+        data.length;
+
+    if (
+        nextPNG !== -1
+    )
+    {
+        end =
+            Math.min(
+                end,
+                nextPNG
+            );
+    }
+
+    if (
+        nextOgg !== -1
+    )
+    {
+        end =
+            Math.min(
+                end,
+                nextOgg
+            );
+    }
+
+    return data.slice(
+        start,
+        end
+    );
+}
+
+
+/* ============================================================
+ JSON
+============================================================ */
+
+function extractJSONAt(
+    data,
+    start,
+    maxSize = 16 * 1024 * 1024
+)
+{
+    if (
+        data[start] !==
+        0x7B
+    )
+    {
+        return null;
+    }
+
+    const limit =
         Math.min(
-            bytes.length,
+            data.length,
             start + maxSize
         );
 
-    const decoder =
-        new TextDecoder(
-            "utf-8",
-            {
-                fatal: false
-            }
-        );
-
     let depth = 0;
-    let inString = false;
+    let stringMode = false;
     let escaped = false;
 
     for (
         let i = start;
-        i < endLimit;
+        i < limit;
         i++
-    ) {
+    )
+    {
+        const b =
+            data[i];
 
-        const byte =
-            bytes[i];
-
-        if (inString) {
-
-            if (escaped) {
+        if (stringMode)
+        {
+            if (escaped)
+            {
                 escaped = false;
-                continue;
             }
-
-            if (byte === 0x5C) {
+            else if (
+                b === 0x5C
+            )
+            {
                 escaped = true;
-                continue;
             }
-
-            if (byte === 0x22) {
-                inString = false;
+            else if (
+                b === 0x22
+            )
+            {
+                stringMode = false;
             }
 
             continue;
         }
 
-        if (byte === 0x22) {
-            inString = true;
+        if (
+            b === 0x22
+        )
+        {
+            stringMode = true;
+
             continue;
         }
 
-        if (byte === 0x7B) {
+        if (
+            b === 0x7B
+        )
+        {
             depth++;
         }
-        else if (byte === 0x7D) {
-
+        else if (
+            b === 0x7D
+        )
+        {
             depth--;
 
-            if (depth === 0) {
-
+            if (
+                depth === 0
+            )
+            {
                 const raw =
-                    bytes.slice(
+                    data.slice(
                         start,
                         i + 1
                     );
 
-                const text =
-                    decoder.decode(
-                        raw
-                    );
-
-                try {
+                try
+                {
+                    const text =
+                        new TextDecoder(
+                            "utf-8"
+                        ).decode(
+                            raw
+                        );
 
                     const object =
                         JSON.parse(
@@ -967,13 +1586,15 @@ function extractJSONAt(
                         end:
                             i + 1,
 
+                        data:
+                            raw,
+
                         text,
                         object
                     };
-
                 }
-                catch {
-
+                catch
+                {
                     return null;
                 }
             }
@@ -985,27 +1606,31 @@ function extractJSONAt(
 
 
 /* ============================================================
-   ¿ES CHART PSYCH ENGINE?
+ CHART
 ============================================================ */
 
-function scoreChart(
+function chartScore(
     object,
     text
-) {
-
+)
+{
     let score = 0;
 
     if (
         object &&
-        typeof object === "object"
-    ) {
+        typeof object ===
+            "object"
+    )
+    {
         score += 5;
     }
 
     if (
         object.song &&
-        typeof object.song === "object"
-    ) {
+        typeof object.song ===
+            "object"
+    )
+    {
         score += 20;
     }
 
@@ -1014,28 +1639,26 @@ function scoreChart(
         Array.isArray(
             object.song.notes
         )
-    ) {
+    )
+    {
         score += 30;
     }
 
     if (
         object.song &&
-        object.song.bpm !== undefined
-    ) {
+        object.song.bpm !==
+            undefined
+    )
+    {
         score += 10;
     }
 
     if (
         object.song &&
-        object.song.song
-    ) {
-        score += 10;
-    }
-
-    if (
-        object.song &&
-        object.song.speed !== undefined
-    ) {
+        object.song.speed !==
+            undefined
+    )
+    {
         score += 10;
     }
 
@@ -1043,8 +1666,9 @@ function scoreChart(
         text.includes(
             "sectionNotes"
         )
-    ) {
-        score += 15;
+    )
+    {
+        score += 20;
     }
 
     return Math.min(
@@ -1055,14 +1679,14 @@ function scoreChart(
 
 
 /* ============================================================
-   BUSCAR JSONS
+ JSON SCANNER
 ============================================================ */
 
 function extractJSONResources(
-    bytes
-) {
-
-    const candidates = [];
+    data
+)
+{
+    const output = [];
 
     let position = 0;
 
@@ -1070,117 +1694,100 @@ function extractJSONResources(
 
     while (
         position <
-        bytes.length &&
-        attempts < 50000
-    ) {
-
-        const found =
+            data.length &&
+        attempts <
+            100000
+    )
+    {
+        const start =
             findSignature(
-                bytes,
+                data,
                 [0x7B],
                 position
             );
 
-        if (found === -1) {
+        if (
+            start === -1
+        )
+        {
             break;
         }
 
         attempts++;
 
-        const extracted =
+        const candidate =
             extractJSONAt(
-                bytes,
-                found
+                data,
+                start
             );
 
-        if (extracted) {
-
+        if (
+            candidate
+        )
+        {
             const score =
-                scoreChart(
-                    extracted.object,
-                    extracted.text
+                chartScore(
+                    candidate.object,
+                    candidate.text
                 );
-
-            /*
-              Solo guardamos JSON suficientemente
-              grandes/estructurados como para ser útiles.
-            */
 
             if (
                 score >= 10
-            ) {
-
-                candidates.push(
+            )
+            {
+                output.push(
                 {
-                    offset:
-                        found,
+                    data:
+                        candidate.data,
 
-                    end:
-                        extracted.end,
+                    object:
+                        candidate.object,
 
-                    size:
-                        extracted.end -
-                        found,
+                    text:
+                        candidate.text,
 
                     score,
 
-                    object:
-                        extracted.object,
-
-                    text:
-                        extracted.text
+                    offset:
+                        start
                 });
 
                 position =
-                    extracted.end;
+                    candidate.end;
 
                 continue;
             }
         }
 
         position =
-            found + 1;
-
-        if (
-            attempts % 500 === 0
-        ) {
-            progress(
-                20 +
-                Math.min(
-                    35,
-                    attempts / 1000
-                )
-            );
-        }
+            start + 1;
     }
 
-    return deduplicateJSON(
-        candidates
+    return dedupeJSON(
+        output
     );
 }
 
 
-/* ============================================================
-   ELIMINAR DUPLICADOS
-============================================================ */
-
-function deduplicateJSON(
+function dedupeJSON(
     list
-) {
-
+)
+{
     const result = [];
     const seen = new Set();
 
     for (
-        const item of list
-    ) {
-
+        const item
+        of list
+    )
+    {
         const key =
             item.text;
 
         if (
             seen.has(key)
-        ) {
+        )
+        {
             continue;
         }
 
@@ -1196,88 +1803,31 @@ function deduplicateJSON(
 
 
 /* ============================================================
-   BUSCAR NOMBRES CERCANOS
+ EXTRACCIÓN
 ============================================================ */
 
-function findNearbyFilename(
-    bytes,
-    offset,
-    extension
-) {
+async function extractAll()
+{
+    const files = [];
 
-    const decoder =
-        new TextDecoder(
-            "latin1"
-        );
+    const charts = [];
 
-    const range =
-        4096;
-
-    const start =
-        Math.max(
-            0,
-            offset - range
-        );
-
-    const end =
-        Math.min(
-            bytes.length,
-            offset + range
-        );
-
-    const text =
-        decoder.decode(
-            bytes.slice(
-                start,
-                end
-            )
-        );
-
-    const regex =
-        new RegExp(
-            `[A-Za-z0-9_./\\\\ -]{1,180}\\\\${extension}|` +
-            `[A-Za-z0-9_./\\\\ -]{1,180}\\${extension}`,
-            "ig"
-        );
-
-    const match =
-        text.match(
-            regex
-        );
-
-    if (!match) {
-        return null;
-    }
-
-    return safeFilename(
-        match[0]
-            .replace(
-                /\\/g,
-                "/"
-            )
-            .split("/")
-            .pop()
-    );
-}
+    let imageIndex = 0;
+    let audioIndex = 0;
+    let videoIndex = 0;
+    let dataIndex = 0;
+    let jsonChartIndex = 0;
 
 
-/* ============================================================
-   EXTRAER TODO
-============================================================ */
-
-async function extractAll() {
-
-    const output = [];
-
-    /*
-      PNG
-    */
+    /* --------------------------------------------------------
+       PNG
+    -------------------------------------------------------- */
 
     setStatus(
         "🖼️ Extrayendo PNG..."
     );
 
-    progress(5);
+    setProgress(5);
 
     const pngSig =
     [
@@ -1292,76 +1842,73 @@ async function extractAll() {
     ];
 
     let position = 0;
-    let pngIndex = 0;
 
-    while (true) {
-
+    while (true)
+    {
         const found =
             findSignature(
-                selectedBytes,
+                bytes,
                 pngSig,
                 position
             );
 
-        if (found === -1) {
+        if (
+            found === -1
+        )
+        {
             break;
         }
 
-        const data =
+        const extracted =
             extractPNG(
-                selectedBytes,
+                bytes,
                 found
             );
 
-        if (data) {
+        if (
+            extracted
+        )
+        {
+            imageIndex++;
 
-            pngIndex++;
-
-            const nearby =
-                findNearbyFilename(
-                    selectedBytes,
-                    found,
-                    ".png"
-                );
-
-            const filename =
-                safeFilename(
-                    nearby ||
-                    `image_${pngIndex}.png`
-                );
-
-            const path =
-                `assets/images/${pngIndex}_${filename}`;
-
-            output.push(
+            files.push(
             {
-                path,
-                data,
-                type: "PNG",
-                offset: found
+                path:
+                    `assets/images/image_${
+                        imageIndex
+                    }.png`,
+
+                data:
+                    extracted,
+
+                type:
+                    "PNG",
+
+                offset:
+                    found
             });
 
             position =
                 found +
-                data.length;
+                extracted.length;
         }
-        else {
-
+        else
+        {
             position =
                 found + 8;
         }
     }
 
 
-    /*
-      JPG
-    */
+    /* --------------------------------------------------------
+       JPEG
+    -------------------------------------------------------- */
 
     setStatus(
-        "🖼️ Extrayendo JPEG..."
+        "🖼️ Extrayendo JPG..."
     );
 
-    progress(15);
+    setProgress(15);
 
     const jpgSig =
     [
@@ -1372,116 +1919,135 @@ async function extractAll() {
 
     position = 0;
 
-    let jpgIndex = 0;
-
-    while (true) {
-
+    while (true)
+    {
         const found =
             findSignature(
-                selectedBytes,
+                bytes,
                 jpgSig,
                 position
             );
 
-        if (found === -1) {
+        if (
+            found === -1
+        )
+        {
             break;
         }
 
-        const data =
+        const extracted =
             extractJPG(
-                selectedBytes,
+                bytes,
                 found
             );
 
-        if (data) {
+        if (
+            extracted
+        )
+        {
+            imageIndex++;
 
-            jpgIndex++;
-
-            output.push(
+            files.push(
             {
                 path:
-                    `assets/images/jpg_${jpgIndex}.jpg`,
+                    `assets/images/image_${
+                        imageIndex
+                    }.jpg`,
 
-                data,
-                type: "JPEG",
-                offset: found
+                data:
+                    extracted,
+
+                type:
+                    "JPEG",
+
+                offset:
+                    found
             });
 
             position =
                 found +
-                data.length;
+                extracted.length;
         }
-        else {
-
+        else
+        {
             position =
                 found + 3;
         }
     }
 
 
-    /*
-      RIFF
-    */
+    /* --------------------------------------------------------
+       RIFF / WAV / WEBP
+    -------------------------------------------------------- */
 
     setStatus(
-        "🔊 Extrayendo WAV/WebP..."
+        "🔊 Extrayendo WAV y WEBP..."
     );
 
-    progress(25);
+    setProgress(25);
 
     const riffSig =
-        textBytes("RIFF");
+        ascii("RIFF");
 
     position = 0;
 
-    let wavIndex = 0;
-    let webpIndex = 0;
-
-    while (true) {
-
+    while (true)
+    {
         const found =
             findSignature(
-                selectedBytes,
+                bytes,
                 riffSig,
                 position
             );
 
-        if (found === -1) {
+        if (
+            found === -1
+        )
+        {
             break;
         }
 
         if (
             hasSignature(
-                selectedBytes,
+                bytes,
                 found + 8,
-                textBytes("WAVE")
+                ascii("WAVE")
             )
-        ) {
-
-            const data =
+        )
+        {
+            const extracted =
                 extractRIFF(
-                    selectedBytes,
+                    bytes,
                     found,
                     "WAVE"
                 );
 
-            if (data) {
+            if (
+                extracted
+            )
+            {
+                audioIndex++;
 
-                wavIndex++;
-
-                output.push(
+                files.push(
                 {
                     path:
-                        `assets/audio/wav_${wavIndex}.wav`,
+                        `assets/audio/audio_${
+                            audioIndex
+                        }.wav`,
 
-                    data,
-                    type: "WAV",
-                    offset: found
+                    data:
+                        extracted,
+
+                    type:
+                        "WAV",
+
+                    offset:
+                        found
                 });
 
                 position =
                     found +
-                    data.length;
+                    extracted.length;
 
                 continue;
             }
@@ -1489,36 +2055,45 @@ async function extractAll() {
 
         if (
             hasSignature(
-                selectedBytes,
+                bytes,
                 found + 8,
-                textBytes("WEBP")
+                ascii("WEBP")
             )
-        ) {
-
-            const data =
+        )
+        {
+            const extracted =
                 extractRIFF(
-                    selectedBytes,
+                    bytes,
                     found,
                     "WEBP"
                 );
 
-            if (data) {
+            if (
+                extracted
+            )
+            {
+                imageIndex++;
 
-                webpIndex++;
-
-                output.push(
+                files.push(
                 {
                     path:
-                        `assets/images/webp_${webpIndex}.webp`,
+                        `assets/images/image_${
+                            imageIndex
+                        }.webp`,
 
-                    data,
-                    type: "WEBP",
-                    offset: found
+                    data:
+                        extracted,
+
+                    type:
+                        "WEBP",
+
+                    offset:
+                        found
                 });
 
                 position =
                     found +
-                    data.length;
+                    extracted.length;
 
                 continue;
             }
@@ -1529,15 +2104,15 @@ async function extractAll() {
     }
 
 
-    /*
-      OGG
-    */
+    /* --------------------------------------------------------
+       OGG
+    -------------------------------------------------------- */
 
     setStatus(
         "🎵 Extrayendo OGG..."
     );
 
-    progress(35);
+    setProgress(35);
 
     const oggSig =
     [
@@ -1549,580 +2124,757 @@ async function extractAll() {
 
     position = 0;
 
-    let oggIndex = 0;
-
-    while (true) {
-
+    while (true)
+    {
         const found =
             findSignature(
-                selectedBytes,
+                bytes,
                 oggSig,
                 position
             );
 
-        if (found === -1) {
+        if (
+            found === -1
+        )
+        {
             break;
         }
 
-        const data =
+        const extracted =
             extractOGG(
-                selectedBytes,
+                bytes,
                 found
             );
 
-        if (data) {
+        if (
+            extracted
+        )
+        {
+            audioIndex++;
 
-            oggIndex++;
-
-            const nearby =
-                findNearbyFilename(
-                    selectedBytes,
-                    found,
-                    ".ogg"
-                );
-
-            const filename =
-                safeFilename(
-                    nearby ||
-                    `audio_${oggIndex}.ogg`
-                );
-
-            output.push(
+            files.push(
             {
                 path:
-                    `assets/audio/${oggIndex}_${filename}`,
+                    `assets/audio/audio_${
+                        audioIndex
+                    }.ogg`,
 
-                data,
-                type: "OGG",
-                offset: found
+                data:
+                    extracted,
+
+                type:
+                    "OGG",
+
+                offset:
+                    found
             });
 
             position =
                 found +
-                data.length;
+                extracted.length;
         }
-        else {
-
+        else
+        {
             position =
                 found + 4;
         }
     }
 
 
-    /*
-      JSON
-    */
+    /* --------------------------------------------------------
+       MP3
+    -------------------------------------------------------- */
 
     setStatus(
-        "📊 Buscando JSON reales y charts..."
+        "🎵 Extrayendo MP3..."
     );
 
-    progress(50);
+    setProgress(45);
 
-    const jsonCandidates =
+    const id3Sig =
+        ascii("ID3");
+
+    position = 0;
+
+    while (true)
+    {
+        const found =
+            findSignature(
+                bytes,
+                id3Sig,
+                position
+            );
+
+        if (
+            found === -1
+        )
+        {
+            break;
+        }
+
+        const extracted =
+            extractMP3(
+                bytes,
+                found
+            );
+
+        if (
+            extracted &&
+            extracted.length >
+                128
+        )
+        {
+            audioIndex++;
+
+            files.push(
+            {
+                path:
+                    `assets/audio/audio_${
+                        audioIndex
+                    }.mp3`,
+
+                data:
+                    extracted,
+
+                type:
+                    "MP3",
+
+                offset:
+                    found
+            });
+
+            position =
+                found +
+                extracted.length;
+        }
+        else
+        {
+            position =
+                found + 3;
+        }
+    }
+
+
+    /* --------------------------------------------------------
+       MP4
+    -------------------------------------------------------- */
+
+    setStatus(
+        "🎬 Extrayendo MP4..."
+    );
+
+    setProgress(55);
+
+    const ftyp =
+        ascii("ftyp");
+
+    position = 0;
+
+    while (true)
+    {
+        const found =
+            findSignature(
+                bytes,
+                ftyp,
+                position
+            );
+
+        if (
+            found === -1
+        )
+        {
+            break;
+        }
+
+        const extracted =
+            extractMP4(
+                bytes,
+                found
+            );
+
+        if (
+            extracted
+        )
+        {
+            videoIndex++;
+
+            files.push(
+            {
+                path:
+                    `assets/video/video_${
+                        videoIndex
+                    }.mp4`,
+
+                data:
+                    extracted.data,
+
+                type:
+                    "MP4",
+
+                offset:
+                    extracted.start
+            });
+
+            position =
+                extracted.end;
+        }
+        else
+        {
+            position =
+                found + 4;
+        }
+    }
+
+
+    /* --------------------------------------------------------
+       WEBM
+    -------------------------------------------------------- */
+
+    setStatus(
+        "🎬 Extrayendo WEBM..."
+    );
+
+    setProgress(62);
+
+    const webmSig =
+        ascii("webm");
+
+    position = 0;
+
+    while (true)
+    {
+        const found =
+            findSignature(
+                bytes,
+                webmSig,
+                position
+            );
+
+        if (
+            found === -1
+        )
+        {
+            break;
+        }
+
+        /*
+          Retrocedemos para buscar EBML.
+        */
+
+        const start =
+            Math.max(
+                0,
+                found - 64
+            );
+
+        const extracted =
+            extractWebM(
+                bytes,
+                start
+            );
+
+        if (
+            extracted &&
+            extracted.length >
+                1024
+        )
+        {
+            videoIndex++;
+
+            files.push(
+            {
+                path:
+                    `assets/video/video_${
+                        videoIndex
+                    }.webm`,
+
+                data:
+                    extracted,
+
+                type:
+                    "WEBM",
+
+                offset:
+                    start
+            });
+
+            position =
+                start +
+                extracted.length;
+        }
+        else
+        {
+            position =
+                found + 4;
+        }
+    }
+
+
+    /* --------------------------------------------------------
+       JSON
+    -------------------------------------------------------- */
+
+    setStatus(
+        "📊 Extrayendo JSON y buscando charts..."
+    );
+
+    setProgress(70);
+
+    const jsonFiles =
         extractJSONResources(
-            selectedBytes
+            bytes
         );
 
-    let jsonIndex = 0;
-
-    const charts = [];
-
     for (
-        const candidate
-        of jsonCandidates
-    ) {
-
-        jsonIndex++;
+        const item
+        of jsonFiles
+    )
+    {
+        dataIndex++;
 
         const isChart =
-            candidate.score >= 50;
+            item.score >= 50;
 
-        let filename;
+        let path;
 
-        if (isChart) {
+        if (
+            isChart
+        )
+        {
+            jsonChartIndex++;
 
-            filename =
-                `chart_${charts.length + 1}.json`;
+            path =
+                `assets/data/chart_${
+                    jsonChartIndex
+                }.json`;
 
+            charts.push(
+            {
+                path,
+
+                score:
+                    item.score,
+
+                song:
+                    item.object.song
+                        ? (
+                            item.object.song.song ||
+                            null
+                        )
+                        : null,
+
+                bpm:
+                    item.object.song
+                        ? (
+                            item.object.song.bpm ||
+                            null
+                        )
+                        : null,
+
+                speed:
+                    item.object.song
+                        ? (
+                            item.object.song.speed ||
+                            null
+                        )
+                        : null,
+
+                offset:
+                    item.offset
+            });
         }
-        else {
-
-            filename =
-                `data_${jsonIndex}.json`;
+        else
+        {
+            path =
+                `assets/data/data_${
+                    dataIndex
+                }.json`;
         }
 
-        const path =
-            `assets/data/${filename}`;
-
-        const data =
-            new TextEncoder()
-                .encode(
-                    candidate.text
-                );
-
-        output.push(
+        files.push(
         {
             path,
-            data,
+
+            data:
+                item.data,
+
             type:
                 isChart
                     ? "PSYCH_CHART"
                     : "JSON",
 
             offset:
-                candidate.offset,
+                item.offset,
 
             score:
-                candidate.score
+                item.score
         });
-
-        if (isChart) {
-
-            charts.push(
-            {
-                path,
-                score:
-                    candidate.score,
-
-                offset:
-                    candidate.offset,
-
-                size:
-                    candidate.size,
-
-                song:
-                    candidate.object &&
-                    candidate.object.song
-                        ? candidate.object.song.song || null
-                        : null,
-
-                bpm:
-                    candidate.object &&
-                    candidate.object.song
-                        ? candidate.object.song.bpm || null
-                        : null,
-
-                speed:
-                    candidate.object &&
-                    candidate.object.song
-                        ? candidate.object.song.speed || null
-                        : null
-            });
-        }
     }
 
 
-    progress(100);
+    setProgress(100);
 
     return {
-        files: output,
+        files,
         charts
     };
 }
 
 
 /* ============================================================
-   EXTRAER
+ EXTRACCIÓN ZIP
 ============================================================ */
 
-extractButton.addEventListener(
-    "click",
-    async () => {
+/*
+  ZIP incrustado:
+  V7 lo detecta y lo conserva como ZIP.
+  No lo descomprime aquí porque una descompresión completa
+  de cientos de MB podría agotar la memoria del navegador.
+*/
 
-        if (
-            !selectedBytes ||
-            !analysis
-        ) {
-            return;
-        }
-
-        extractButton.disabled =
-            true;
-
-        analyzeButton.disabled =
-            true;
-
-        try {
-
-            const extracted =
-                await extractAll();
-
-            setStatus(
-                "📦 Generando proyecto web..."
-            );
-
-            const zip =
-                buildProject(
-                    extracted
-                );
-
-            const blob =
-                new Blob(
-                    [zip],
-                    {
-                        type:
-                            "application/zip"
-                    }
-                );
-
-            const url =
-                URL.createObjectURL(
-                    blob
-                );
-
-            const link =
-                document.createElement(
-                    "a"
-                );
-
-            link.href = url;
-
-            link.download =
-                "MissaWeb.zip";
-
-            document.body.appendChild(
-                link
-            );
-
-            link.click();
-
-            link.remove();
-
-            setStatus(
-                "✅ MISSA WEB GENERADO\n\n" +
-
-                `Archivos extraídos: ${
-                    extracted.files.length
-                }\n` +
-
-                `Charts detectados: ${
-                    extracted.charts.length
-                }\n\n` +
-
-                "Descarga: MissaWeb.zip"
-            );
-
-            showExtractionResults(
-                extracted
-            );
-
-        }
-        catch (error) {
-
-            console.error(error);
-
-            setStatus(
-                "❌ Error:\n\n" +
-                error.message
-            );
-
-        }
-        finally {
-
-            extractButton.disabled =
-                false;
-
-            analyzeButton.disabled =
-                false;
-        }
-    }
-);
-
-
-/* ============================================================
-   RESULTADO EXTRACCIÓN
-============================================================ */
-
-function showExtractionResults(
-    extracted
-) {
-
-    results.innerHTML = "";
-
-    addResult(
-        "Archivos extraídos",
-        extracted.files.length
-    );
-
-    addResult(
-        "Charts Psych Engine",
-        extracted.charts.length
-    );
-
-    const chartNames =
-        extracted.charts
-            .slice(0, 20)
-            .map(
-                (chart, index) =>
-                    `${index + 1}. ${
-                        chart.song ||
-                        chart.path
-                    }`
-            )
-            .join("\n");
-
-    if (chartNames) {
-
-        addResult(
-            "Charts detectados",
-            `<pre style="white-space:pre-wrap">${
-                chartNames
-            }</pre>`
-        );
-    }
-    else {
-
-        addResult(
-            "Charts detectados",
-            "⚠️ Ningún JSON alcanzó la puntuación de chart."
-        );
-    }
-}
-
-
-/* ============================================================
-   PROYECTO WEB
-============================================================ */
-
-function buildProject(
-    extracted
-) {
-
-    const files = [];
-
-
+function extractZIP(
+    data,
+    start
+)
+{
     /*
-      Los recursos extraídos.
+      Buscamos EOCD.
     */
+
+    const minimum =
+        Math.max(
+            start,
+            data.length -
+            65557
+        );
 
     for (
-        const item
-        of extracted.files
-    ) {
-
-        files.push(
+        let i =
+            data.length - 22;
+        i >= minimum;
+        i--
+    )
+    {
+        if (
+            hasSignature(
+                data,
+                i,
+                [
+                    0x50,
+                    0x4B,
+                    0x05,
+                    0x06
+                ]
+            )
+        )
         {
-            name:
-                item.path,
+            const commentLength =
+                readU16LE(
+                    data,
+                    i + 20
+                );
 
-            data:
-                item.data
-        });
+            const end =
+                i +
+                22 +
+                commentLength;
+
+            if (
+                end <=
+                data.length
+            )
+            {
+                return data.slice(
+                    start,
+                    end
+                );
+            }
+        }
     }
 
+    return null;
+}
 
-    /*
-      Manifest.
-    */
 
-    const manifest =
+/* ============================================================
+ ZIP DEL PROYECTO
+============================================================ */
+
+function crc32(data)
+{
+    let crc =
+        0xFFFFFFFF;
+
+    for (
+        let i = 0;
+        i < data.length;
+        i++
+    )
     {
-        converter:
+        crc ^= data[i];
+
+        for (
+            let j = 0;
+            j < 8;
+            j++
+        )
         {
-            version:
-                "6.0.0"
-        },
+            crc =
+                (
+                    crc >>> 1
+                ) ^
+                (
+                    crc & 1
+                        ? 0xEDB88320
+                        : 0
+                );
+        }
+    }
 
-        original:
+    return (
+        crc ^
+        0xFFFFFFFF
+    ) >>> 0;
+}
+
+
+function push16(
+    array,
+    value
+)
+{
+    array.push(
+        value & 255,
+        (value >>> 8) & 255
+    );
+}
+
+
+function push32(
+    array,
+    value
+)
+{
+    array.push(
+        value & 255,
+        (value >>> 8) & 255,
+        (value >>> 16) & 255,
+        (value >>> 24) & 255
+    );
+}
+
+
+function createZIP(
+    files
+)
+{
+    const output = [];
+    const central = [];
+
+    let offset = 0;
+
+    for (
+        const file
+        of files
+    )
+    {
+        const name =
+            new TextEncoder()
+                .encode(
+                    file.name
+                );
+
+        const data =
+            file.data;
+
+        const crc =
+            crc32(data);
+
+        const local = [];
+
+        push32(
+            local,
+            0x04034B50
+        );
+
+        push16(local,20);
+        push16(local,0);
+        push16(local,0);
+        push16(local,0);
+        push16(local,0);
+
+        push32(local,crc);
+
+        push32(
+            local,
+            data.length
+        );
+
+        push32(
+            local,
+            data.length
+        );
+
+        push16(
+            local,
+            name.length
+        );
+
+        push16(local,0);
+
+        for (
+            const b
+            of name
+        )
         {
-            name:
-                selectedFile.name,
+            local.push(b);
+        }
 
-            size:
-                selectedFile.size
-        },
-
-        engine:
+        for (
+            const b
+            of data
+        )
         {
-            fnf:
-                analysis.engine.fnf,
+            local.push(b);
+        }
 
-            psychEngine:
-                analysis.engine.psych,
-
-            haxe:
-                analysis.engine.haxe,
-
-            haxeflixel:
-                analysis.engine.flixel,
-
-            openfl:
-                analysis.engine.openfl,
-
-            lime:
-                analysis.engine.lime
-        },
-
-        charts:
-            extracted.charts,
-
-        files:
-            extracted.files.map(
-                item =>
-                ({
-                    path:
-                        item.path,
-
-                    type:
-                        item.type,
-
-                    size:
-                        item.data.length,
-
-                    offset:
-                        item.offset,
-
-                    score:
-                        item.score || null
-                })
-            )
-    };
+        output.push(...local);
 
 
-    files.push(
+        const entry = [];
+
+        push32(
+            entry,
+            0x02014B50
+        );
+
+        push16(entry,20);
+        push16(entry,20);
+        push16(entry,0);
+        push16(entry,0);
+        push16(entry,0);
+        push16(entry,0);
+
+        push32(entry,crc);
+
+        push32(
+            entry,
+            data.length
+        );
+
+        push32(
+            entry,
+            data.length
+        );
+
+        push16(
+            entry,
+            name.length
+        );
+
+        push16(entry,0);
+        push16(entry,0);
+        push16(entry,0);
+        push16(entry,0);
+
+        push32(entry,0);
+
+        push32(
+            entry,
+            offset
+        );
+
+        entry.push(...name);
+
+        central.push(entry);
+
+        offset +=
+            local.length;
+    }
+
+    const centralOffset =
+        output.length;
+
+    let centralSize = 0;
+
+    for (
+        const entry
+        of central
+    )
     {
-        name:
-            "manifest.json",
+        output.push(...entry);
 
-        data:
-            new TextEncoder()
-                .encode(
-                    JSON.stringify(
-                        manifest,
-                        null,
-                        4
-                    )
-                )
-    });
+        centralSize +=
+            entry.length;
+    }
 
+    push32(
+        output,
+        0x06054B50
+    );
 
-    /*
-      README.
-    */
+    push16(output,0);
+    push16(output,0);
 
-    files.push(
-    {
-        name:
-            "README.txt",
+    push16(
+        output,
+        files.length
+    );
 
-        data:
-            new TextEncoder()
-                .encode(
-`MISSA V3 WEB
-============
+    push16(
+        output,
+        files.length
+    );
 
-Extractor V6
+    push32(
+        output,
+        centralSize
+    );
 
-El proyecto contiene recursos
-recuperados directamente del EXE.
+    push32(
+        output,
+        centralOffset
+    );
 
-Charts detectados:
-${extracted.charts.length}
+    push16(output,0);
 
-El siguiente paso es seleccionar
-un chart y un audio y ejecutar
-el runtime FNF.
-
-IMPORTANTE:
-
-El código nativo compilado de
-Psych Engine NO se ha traducido
-automáticamente a JavaScript.
-
-Los datos recuperados sí pueden
-ser interpretados por un runtime web.
-`
-                )
-    });
-
-
-    /*
-      index.html
-    */
-
-    files.push(
-    {
-        name:
-            "index.html",
-
-        data:
-            new TextEncoder()
-                .encode(
-                    createGameHTML(
-                        extracted.charts
-                    )
-                )
-    });
-
-
-    /*
-      game.js
-    */
-
-    files.push(
-    {
-        name:
-            "game.js",
-
-        data:
-            new TextEncoder()
-                .encode(
-                    createGameJS()
-                )
-    });
-
-
-    /*
-      CSS
-    */
-
-    files.push(
-    {
-        name:
-            "style.css",
-
-        data:
-            new TextEncoder()
-                .encode(
-                    createGameCSS()
-                )
-    });
-
-
-    return createZip(
-        files
+    return new Uint8Array(
+        output
     );
 }
 
 
 /* ============================================================
-   HTML DEL JUEGO
+ CREAR GAME HTML
 ============================================================ */
 
 function createGameHTML(
     charts
-) {
-
+)
+{
     const chartOptions =
         charts.length
             ? charts.map(
                 (chart, index) =>
-                    `<option value="assets/data/chart_${
-                        index + 1
-                    }.json">${
-                        escapeHTML(
-                            chart.song ||
-                            `Chart ${index + 1}`
-                        )
-                    }</option>`
-            ).join("\n")
-            : `<option>
-                No se detectaron charts
-               </option>`;
-
+                    `
+<option value="assets/data/chart_${
+    index + 1
+}.json">
+${
+    chart.song ||
+    `Chart ${index + 1}`
+}
+</option>
+`
+            ).join("")
+            : `
+<option>
+No se detectaron charts
+</option>
+`;
 
     return `<!DOCTYPE html>
+
 <html lang="es">
 
 <head>
@@ -2134,7 +2886,7 @@ function createGameHTML(
     content="width=device-width,initial-scale=1"
 >
 
-<title>Missa V3 Web</title>
+<title>Missa V7 Web</title>
 
 <link
     rel="stylesheet"
@@ -2147,35 +2899,33 @@ function createGameHTML(
 
 <div id="menu">
 
-<h1>🎵 MISSA V3 WEB</h1>
+<h1>🎵 MISSA V7 WEB</h1>
 
-<p>
-Runtime FNF experimental
-</p>
+<p>Runtime FNF experimental</p>
 
 <label>
-Chart:
+Chart
 </label>
 
-<select id="chartSelect">
-
+<select id="chart">
 ${chartOptions}
-
 </select>
 
+<br>
+
 <label>
-Audio OGG:
+Audio
 </label>
 
 <input
-    id="audioFile"
+    id="audio"
     type="file"
-    accept=".ogg,.wav,.mp3"
+    accept=".ogg,.mp3,.wav"
 >
 
 <br>
 
-<button id="startButton">
+<button id="play">
 ▶ JUGAR
 </button>
 
@@ -2185,7 +2935,7 @@ Esperando...
 
 </div>
 
-<canvas id="gameCanvas"></canvas>
+<canvas id="game"></canvas>
 
 <script src="game.js"></script>
 
@@ -2196,50 +2946,45 @@ Esperando...
 
 
 /* ============================================================
-   JS DEL JUEGO
+ GAME JS
 ============================================================ */
 
-function createGameJS() {
-
+function createGameJS()
+{
     return String.raw`
 "use strict";
 
 const canvas =
-    document.getElementById(
-        "gameCanvas"
-    );
+    document.getElementById("game");
 
 const ctx =
-    canvas.getContext(
-        "2d"
-    );
+    canvas.getContext("2d");
 
 const menu =
-    document.getElementById(
-        "menu"
-    );
+    document.getElementById("menu");
 
 const chartSelect =
-    document.getElementById(
-        "chartSelect"
-    );
+    document.getElementById("chart");
 
-const audioFile =
-    document.getElementById(
-        "audioFile"
-    );
+const audioInput =
+    document.getElementById("audio");
 
-const startButton =
-    document.getElementById(
-        "startButton"
-    );
+const playButton =
+    document.getElementById("play");
 
 const info =
-    document.getElementById(
-        "info"
-    );
+    document.getElementById("info");
 
-const LANES = 4;
+let chart = null;
+let notes = [];
+let audio = null;
+
+let playing = false;
+
+let score = 0;
+let combo = 0;
+let misses = 0;
+let health = 1;
 
 const KEYS = [
     "ArrowLeft",
@@ -2248,61 +2993,29 @@ const KEYS = [
     "ArrowRight"
 ];
 
-const NOTE_SPEED = 0.55;
-
-let chart = null;
-
-let notes = [];
-
-let audio = null;
-
-let playing = false;
-
-let score = 0;
-
-let combo = 0;
-
-let misses = 0;
-
-let health = 1;
-
-let rating = "";
-
-let ratingTime = 0;
-
-
-/* ============================================================
- RESIZE
-============================================================ */
-
-function resize() {
-
+function resize()
+{
     canvas.width =
-        window.innerWidth;
+        innerWidth;
 
     canvas.height =
-        window.innerHeight;
+        innerHeight;
 }
 
-window.addEventListener(
+addEventListener(
     "resize",
     resize
 );
 
 resize();
 
-
-/* ============================================================
- LOAD CHART
-============================================================ */
-
-async function loadChart(url) {
-
+async function loadChart(url)
+{
     const response =
         await fetch(url);
 
-    if (!response.ok) {
-
+    if (!response.ok)
+    {
         throw new Error(
             "No se pudo cargar el chart."
         );
@@ -2316,10 +3029,10 @@ async function loadChart(url) {
         !Array.isArray(
             data.song.notes
         )
-    ) {
-
+    )
+    {
         throw new Error(
-            "El JSON no tiene estructura Psych Engine reconocible."
+            "El archivo no tiene estructura Psych Engine."
         );
     }
 
@@ -2331,52 +3044,42 @@ async function loadChart(url) {
     for (
         const section
         of chart.notes
-    ) {
-
+    )
+    {
         if (
             !Array.isArray(
                 section.sectionNotes
             )
-        ) {
+        )
+        {
             continue;
         }
 
         for (
             const raw
             of section.sectionNotes
-        ) {
-
+        )
+        {
             if (
                 !Array.isArray(raw) ||
                 raw.length < 2
-            ) {
+            )
+            {
                 continue;
             }
 
             const time =
                 Number(raw[0]);
 
-            const rawLane =
-                Number(raw[1]);
-
-            const sustain =
-                Number(
-                    raw[2] || 0
-                );
-
-            /*
-                El juego completo de Psych Engine
-                distingue notas de jugador/rival.
-
-                Esta primera versión usa el
-                conjunto de lanes como entrada jugable.
-            */
+            const lane =
+                (
+                    Number(raw[1]) %
+                    4 + 4
+                ) % 4;
 
             notes.push({
                 time,
-                lane:
-                    ((rawLane % 4) + 4) % 4,
-                sustain,
+                lane,
                 hit: false,
                 missed: false
             });
@@ -2384,15 +3087,14 @@ async function loadChart(url) {
     }
 
     notes.sort(
-        (a, b) =>
-            a.time -
-            b.time
+        (a,b) =>
+            a.time - b.time
     );
 
     info.textContent =
-        `Chart: ${
+        `Canción: ${
             chart.song ||
-            "Unknown"
+            "?"
         } | BPM: ${
             chart.bpm ||
             "?"
@@ -2401,107 +3103,76 @@ async function loadChart(url) {
         }`;
 }
 
-
-/* ============================================================
- AUDIO
-============================================================ */
-
-function loadAudioFromFile(
-    file
-) {
-
-    if (audio) {
-
-        audio.pause();
-
-        URL.revokeObjectURL(
-            audio.src
-        );
-    }
-
+function loadAudio(file)
+{
     const url =
-        URL.createObjectURL(
-            file
-        );
+        URL.createObjectURL(file);
 
     audio =
-        new Audio(
-            url
-        );
+        new Audio(url);
 
     audio.preload =
         "auto";
 
     return new Promise(
-        (resolve, reject) => {
-
+        (resolve,reject) =>
+        {
             audio.addEventListener(
                 "canplaythrough",
                 resolve,
-                {
-                    once: true
-                }
+                {once:true}
             );
 
             audio.addEventListener(
                 "error",
-                () => reject(
-                    new Error(
-                        "No se pudo cargar el audio."
-                    )
-                ),
-                {
-                    once: true
-                }
+                () =>
+                    reject(
+                        new Error(
+                            "No se pudo cargar el audio."
+                        )
+                    ),
+                {once:true}
             );
         }
     );
 }
 
-
-/* ============================================================
- START
-============================================================ */
-
-startButton.addEventListener(
+playButton.addEventListener(
     "click",
-    async () => {
-
-        try {
-
-            const chartURL =
-                chartSelect.value;
-
-            await loadChart(
-                chartURL
-            );
-
+    async () =>
+    {
+        try
+        {
             if (
-                !audioFile.files.length
-            ) {
-
+                !audioInput.files.length
+            )
+            {
                 throw new Error(
-                    "Selecciona primero un OGG/WAV/MP3."
+                    "Selecciona un archivo de audio."
                 );
             }
 
-            await loadAudioFromFile(
-                audioFile.files[0]
+            await loadChart(
+                chartSelect.value
             );
+
+            await loadAudio(
+                audioInput.files[0]
+            );
+
+            for (
+                const note
+                of notes
+            )
+            {
+                note.hit = false;
+                note.missed = false;
+            }
 
             score = 0;
             combo = 0;
             misses = 0;
             health = 1;
-
-            for (
-                const note
-                of notes
-            ) {
-
-                note.hit = false;
-                note.missed = false;
-            }
 
             menu.style.display =
                 "none";
@@ -2509,12 +3180,9 @@ startButton.addEventListener(
             playing = true;
 
             await audio.play();
-
         }
-        catch(error) {
-
-            console.error(error);
-
+        catch(error)
+        {
             alert(
                 error.message
             );
@@ -2522,166 +3190,107 @@ startButton.addEventListener(
     }
 );
 
-
-/* ============================================================
- INPUT
-============================================================ */
-
-window.addEventListener(
+addEventListener(
     "keydown",
-    event => {
-
-        if (!playing) {
+    event =>
+    {
+        if (!playing)
             return;
-        }
 
         const lane =
             KEYS.indexOf(
                 event.code
             );
 
-        if (
-            lane === -1
-        ) {
+        if (lane < 0)
             return;
-        }
 
         event.preventDefault();
 
-        hitLane(
-            lane
-        );
+        hitNote(lane);
     }
 );
 
-
-function hitLane(lane) {
-
-    if (!audio) {
+function hitNote(lane)
+{
+    if (!audio)
         return;
-    }
 
     const now =
         audio.currentTime *
         1000;
 
-    let best =
-        null;
-
-    let bestDifference =
+    let best = null;
+    let distance =
         Infinity;
 
     for (
         const note
         of notes
-    ) {
-
+    )
+    {
         if (
             note.hit ||
             note.missed
-        ) {
+        )
+        {
             continue;
         }
 
         if (
             note.lane !== lane
-        ) {
+        )
+        {
             continue;
         }
 
-        const difference =
+        const d =
             Math.abs(
                 note.time -
                 now
             );
 
         if (
-            difference <
-            bestDifference
-        ) {
-
-            bestDifference =
-                difference;
-
-            best =
-                note;
+            d < distance
+        )
+        {
+            distance = d;
+            best = note;
         }
     }
 
-    if (!best) {
+    if (!best)
         return;
+
+    if (distance <= 45)
+    {
+        best.hit = true;
+        combo++;
+        score += 350;
+        health =
+            Math.min(
+                1,
+                health + .02
+            );
     }
-
-    if (
-        bestDifference <= 45
-    ) {
-
-        registerHit(
-            best,
-            "SICK",
-            350
-        );
-
+    else if (distance <= 90)
+    {
+        best.hit = true;
+        combo++;
+        score += 200;
     }
-    else if (
-        bestDifference <= 90
-    ) {
-
-        registerHit(
-            best,
-            "GOOD",
-            200
-        );
-
-    }
-    else if (
-        bestDifference <= 135
-    ) {
-
-        registerHit(
-            best,
-            "BAD",
-            100
-        );
+    else if (distance <= 135)
+    {
+        best.hit = true;
+        combo++;
+        score += 100;
     }
 }
 
-
-function registerHit(
-    note,
-    newRating,
-    points
-) {
-
-    note.hit = true;
-
-    combo++;
-
-    score += points;
-
-    health =
-        Math.min(
-            1,
-            health + 0.02
-        );
-
-    rating =
-        newRating;
-
-    ratingTime =
-        450;
-}
-
-
-/* ============================================================
- UPDATE
-============================================================ */
-
-function update() {
-
-    if (!playing || !audio) {
+function update()
+{
+    if (!playing || !audio)
         return;
-    }
 
     const now =
         audio.currentTime *
@@ -2690,12 +3299,13 @@ function update() {
     for (
         const note
         of notes
-    ) {
-
+    )
+    {
         if (
             note.hit ||
             note.missed
-        ) {
+        )
+        {
             continue;
         }
 
@@ -2703,54 +3313,94 @@ function update() {
             now -
             note.time >
             180
-        ) {
-
-            note.missed =
-                true;
-
+        )
+        {
+            note.missed = true;
             combo = 0;
-
             misses++;
 
             health =
                 Math.max(
                     0,
-                    health - 0.05
+                    health - .05
                 );
         }
     }
 
     if (
-        ratingTime >
-        0
-    ) {
-
-        ratingTime -=
-            16;
-    }
-
-    if (
         audio.ended
-    ) {
-
+    )
+    {
         playing = false;
     }
 }
 
+function arrow(
+    x,
+    y,
+    lane,
+    size
+)
+{
+    ctx.save();
 
-/* ============================================================
- RENDER
-============================================================ */
-
-function draw() {
-
-    ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
+    ctx.translate(
+        x,
+        y
     );
 
+    if (lane === 0)
+        ctx.rotate(-Math.PI/2);
+
+    if (lane === 1)
+        ctx.rotate(Math.PI);
+
+    if (lane === 3)
+        ctx.rotate(Math.PI/2);
+
+    ctx.beginPath();
+
+    ctx.moveTo(size,0);
+
+    ctx.lineTo(
+        0,
+        -size
+    );
+
+    ctx.lineTo(
+        -size,
+        0
+    );
+
+    ctx.lineTo(
+        -size/2,
+        0
+    );
+
+    ctx.lineTo(
+        -size/2,
+        size
+    );
+
+    ctx.lineTo(
+        size/2,
+        size
+    );
+
+    ctx.lineTo(
+        size/2,
+        0
+    );
+
+    ctx.closePath();
+
+    ctx.fill();
+
+    ctx.restore();
+}
+
+function draw()
+{
     ctx.fillStyle =
         "#101010";
 
@@ -2762,25 +3412,25 @@ function draw() {
     );
 
     ctx.fillStyle =
-        "#fff";
+        "white";
 
     ctx.font =
         "bold 20px Arial";
 
     ctx.fillText(
-        "Score: " + score,
+        `Score: ${score}`,
         20,
         30
     );
 
     ctx.fillText(
-        "Combo: " + combo,
+        `Combo: ${combo}`,
         20,
         60
     );
 
     ctx.fillText(
-        "Misses: " + misses,
+        `Misses: ${misses}`,
         20,
         90
     );
@@ -2811,36 +3461,53 @@ function draw() {
             canvas.width / 6
         );
 
-    const totalWidth =
-        laneWidth * LANES;
+    const total =
+        laneWidth * 4;
 
     const startX =
         (
             canvas.width -
-            totalWidth
+            total
         ) / 2;
 
     const receptorY =
-        canvas.height - 150;
+        canvas.height -
+        150;
 
     for (
         let lane = 0;
-        lane < LANES;
+        lane < 4;
         lane++
-    ) {
+    )
+    {
+        ctx.strokeStyle =
+            "white";
 
-        drawReceptor(
+        ctx.lineWidth =
+            3;
+
+        ctx.strokeRect(
             startX +
             lane *
-            laneWidth,
+            laneWidth + 8,
             receptorY,
-            laneWidth,
-            lane
+            laneWidth - 16,
+            60
+        );
+
+        arrow(
+            startX +
+            lane *
+            laneWidth +
+            laneWidth/2,
+            receptorY + 30,
+            lane,
+            21
         );
     }
 
-    if (audio) {
-
+    if (audio)
+    {
         const now =
             audio.currentTime *
             1000;
@@ -2848,12 +3515,13 @@ function draw() {
         for (
             const note
             of notes
-        ) {
-
+        )
+        {
             if (
                 note.hit ||
                 note.missed
-            ) {
+            )
+            {
                 continue;
             }
 
@@ -2863,206 +3531,47 @@ function draw() {
 
             const y =
                 receptorY -
-                delta *
-                NOTE_SPEED;
+                delta * .55;
 
             if (
                 y < -100 ||
                 y > canvas.height + 100
-            ) {
+            )
+            {
                 continue;
             }
 
-            drawNote(
+            ctx.fillStyle =
+                "white";
+
+            ctx.fillRect(
                 startX +
                 note.lane *
-                laneWidth,
+                laneWidth + 10,
                 y,
-                laneWidth,
-                note.lane
+                laneWidth - 20,
+                45
+            );
+
+            ctx.fillStyle =
+                "#111";
+
+            arrow(
+                startX +
+                note.lane *
+                laneWidth +
+                laneWidth/2,
+                y + 22,
+                note.lane,
+                17
             );
         }
     }
-
-    if (
-        ratingTime > 0
-    ) {
-
-        ctx.save();
-
-        ctx.textAlign =
-            "center";
-
-        ctx.font =
-            "bold 50px Arial";
-
-        ctx.fillStyle =
-            "#fff";
-
-        ctx.fillText(
-            rating,
-            canvas.width / 2,
-            canvas.height / 2
-        );
-
-        ctx.restore();
-    }
 }
 
-
-/* ============================================================
- ARROW
-============================================================ */
-
-function drawArrow(
-    x,
-    y,
-    lane,
-    size
-) {
-
-    ctx.save();
-
-    ctx.translate(
-        x,
-        y
-    );
-
-    if (
-        lane === 0
-    ) {
-        ctx.rotate(
-            -Math.PI / 2
-        );
-    }
-    else if (
-        lane === 1
-    ) {
-        ctx.rotate(
-            Math.PI
-        );
-    }
-    else if (
-        lane === 3
-    ) {
-        ctx.rotate(
-            Math.PI / 2
-        );
-    }
-
-    ctx.beginPath();
-
-    ctx.moveTo(
-        size,
-        0
-    );
-
-    ctx.lineTo(
-        0,
-        -size
-    );
-
-    ctx.lineTo(
-        -size,
-        0
-    );
-
-    ctx.lineTo(
-        -size / 2,
-        0
-    );
-
-    ctx.lineTo(
-        -size / 2,
-        size
-    );
-
-    ctx.lineTo(
-        size / 2,
-        size
-    );
-
-    ctx.lineTo(
-        size / 2,
-        0
-    );
-
-    ctx.closePath();
-
-    ctx.fill();
-
-    ctx.restore();
-}
-
-
-function drawReceptor(
-    x,
-    y,
-    width,
-    lane
-) {
-
-    ctx.strokeStyle =
-        "#fff";
-
-    ctx.lineWidth =
-        3;
-
-    ctx.strokeRect(
-        x + 8,
-        y,
-        width - 16,
-        60
-    );
-
-    drawArrow(
-        x +
-        width / 2,
-        y + 30,
-        lane,
-        22
-    );
-}
-
-
-function drawNote(
-    x,
-    y,
-    width,
-    lane
-) {
-
-    ctx.fillStyle =
-        "#fff";
-
-    ctx.fillRect(
-        x + 10,
-        y,
-        width - 20,
-        45
-    );
-
-    ctx.fillStyle =
-        "#111";
-
-    drawArrow(
-        x +
-        width / 2,
-        y + 22,
-        lane,
-        18
-    );
-}
-
-
-/* ============================================================
- LOOP
-============================================================ */
-
-function loop() {
-
+function loop()
+{
     update();
-
     draw();
 
     requestAnimationFrame(
@@ -3078,401 +3587,389 @@ requestAnimationFrame(
 
 
 /* ============================================================
-   CSS DEL JUEGO
+ CSS DEL JUEGO
 ============================================================ */
 
-function createGameCSS() {
-
+function createGameCSS()
+{
     return `
-html,
-body {
-
-    margin: 0;
-    padding: 0;
-
-    width: 100%;
-    height: 100%;
-
-    overflow: hidden;
-
-    background: #101010;
-
-    color: white;
-
-    font-family: Arial, sans-serif;
+html,body
+{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#101010;
+    color:white;
+    font-family:Arial,sans-serif;
 }
 
-#menu {
+#menu
+{
+    position:fixed;
 
-    position: fixed;
-
-    z-index: 10;
-
-    top: 50%;
-    left: 50%;
+    left:50%;
+    top:50%;
 
     transform:
-        translate(
-            -50%,
-            -50%
-        );
+        translate(-50%,-50%);
 
-    padding: 30px;
+    z-index:10;
 
-    width: min(
-        500px,
-        90%
-    );
+    width:min(500px,90%);
 
-    text-align: center;
+    padding:30px;
 
-    background: #181818;
+    background:#181818;
 
     border:
-        1px solid
-        #333;
+        1px solid #333;
 
-    border-radius: 16px;
-}
+    border-radius:16px;
 
-#menu h1 {
-
-    margin-top: 0;
+    text-align:center;
 }
 
 select,
 input,
-button {
+button
+{
+    padding:11px;
 
-    margin-top: 10px;
+    margin-top:10px;
 
-    padding: 12px;
-
-    border-radius: 8px;
-
-    border: 1px solid #555;
+    border-radius:8px;
 }
 
-button {
-
-    cursor: pointer;
-
-    font-weight: bold;
+button
+{
+    font-weight:bold;
+    cursor:pointer;
 }
 
-#gameCanvas {
+#game
+{
+    display:block;
 
-    display: block;
-
-    width: 100vw;
-    height: 100vh;
+    width:100vw;
+    height:100vh;
 }
 `;
 }
 
 
 /* ============================================================
- ESCAPAR HTML
+ ZIP FINAL
 ============================================================ */
 
-function escapeHTML(value) {
+function createProjectZIP(
+    extracted
+)
+{
+    const files = [];
 
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+
+    /*
+      Assets
+    */
+
+    for (
+        const file
+        of extracted.files
+    )
+    {
+        files.push(
+        {
+            name:
+                file.path,
+
+            data:
+                file.data
+        });
+    }
+
+
+    /*
+      Manifest
+    */
+
+    const manifest =
+    {
+        converter:
+        {
+            version:
+                "7.0.0"
+        },
+
+        original:
+        {
+            filename:
+                selectedFile.name,
+
+            size:
+                selectedFile.size
+        },
+
+        engine:
+            analysis.engine,
+
+        architecture:
+            analysis.pe.machine,
+
+        resources:
+            analysis.resources,
+
+        charts:
+            extracted.charts,
+
+        files:
+            extracted.files.map(
+                file =>
+                ({
+                    path:
+                        file.path,
+
+                    type:
+                        file.type,
+
+                    size:
+                        file.data.length,
+
+                    offset:
+                        file.offset
+                })
+            )
+    };
+
+
+    files.push(
+    {
+        name:
+            "manifest.json",
+
+        data:
+            new TextEncoder()
+                .encode(
+                    JSON.stringify(
+                        manifest,
+                        null,
+                        4
+                    )
+                )
+    });
+
+
+    files.push(
+    {
+        name:
+            "index.html",
+
+        data:
+            new TextEncoder()
+                .encode(
+                    createGameHTML(
+                        extracted.charts
+                    )
+                )
+    });
+
+
+    files.push(
+    {
+        name:
+            "game.js",
+
+        data:
+            new TextEncoder()
+                .encode(
+                    createGameJS()
+                )
+    });
+
+
+    files.push(
+    {
+        name:
+            "style.css",
+
+        data:
+            new TextEncoder()
+                .encode(
+                    createGameCSS()
+                )
+    });
+
+
+    files.push(
+    {
+        name:
+            "README.txt",
+
+        data:
+            new TextEncoder()
+                .encode(
+`MISSA V3 WEB
+============
+
+Extractor V7.
+
+Formatos multimedia buscados:
+
+PNG
+JPG
+WEBP
+
+OGG
+MP3
+WAV
+
+MP4
+WEBM
+
+JSON
+LUA
+
+ZIP
+
+Charts detectados:
+${
+    extracted.charts.length
+}
+
+El runtime web incluido
+es experimental.
+
+El código nativo de Windows
+no se convierte directamente.
+
+Los recursos recuperados
+se preparan para el runtime web.
+`
+                )
+    });
+
+
+    return createZIP(
+        files
+    );
 }
 
 
 /* ============================================================
- ZIP
+ BOTÓN EXTRAER
 ============================================================ */
 
-function crc32(data) {
-
-    let crc =
-        0xFFFFFFFF;
-
-    for (
-        let i = 0;
-        i < data.length;
-        i++
-    ) {
-
-        crc ^=
-            data[i];
-
-        for (
-            let j = 0;
-            j < 8;
-            j++
-        ) {
-
-            crc =
-                (
-                    crc >>> 1
-                ) ^
-                (
-                    crc & 1
-                        ? 0xEDB88320
-                        : 0
-                );
+extractButton.addEventListener(
+    "click",
+    async () =>
+    {
+        if (
+            !bytes ||
+            !analysis
+        )
+        {
+            return;
         }
-    }
 
-    return (
-        crc ^
-        0xFFFFFFFF
-    ) >>> 0;
-}
+        analyzeButton.disabled =
+            true;
 
-function push16(
-    array,
-    value
-) {
+        extractButton.disabled =
+            true;
 
-    array.push(
-        value & 0xFF,
-        (value >>> 8) & 0xFF
-    );
-}
+        try
+        {
+            const extracted =
+                await extractAll();
 
-function push32(
-    array,
-    value
-) {
+            setStatus(
+                "📦 Empaquetando..."
+            );
 
-    array.push(
-        value & 0xFF,
-        (value >>> 8) & 0xFF,
-        (value >>> 16) & 0xFF,
-        (value >>> 24) & 0xFF
-    );
-}
-
-function createZip(files) {
-
-    const output = [];
-    const central = [];
-
-    let offset = 0;
-
-    for (
-        const file
-        of files
-    ) {
-
-        const name =
-            new TextEncoder()
-                .encode(
-                    file.name
+            const zip =
+                createProjectZIP(
+                    extracted
                 );
 
-        const data =
-            file.data;
+            const blob =
+                new Blob(
+                    [zip],
+                    {
+                        type:
+                            "application/zip"
+                    }
+                );
 
-        const crc =
-            crc32(data);
+            const url =
+                URL.createObjectURL(
+                    blob
+                );
 
-        const local = [];
+            const link =
+                document.createElement(
+                    "a"
+                );
 
-        push32(
-            local,
-            0x04034B50
-        );
+            link.href =
+                url;
 
-        push16(local, 20);
-        push16(local, 0);
-        push16(local, 0);
-        push16(local, 0);
-        push16(local, 0);
+            link.download =
+                "MissaWeb.zip";
 
-        push32(
-            local,
-            crc
-        );
+            document.body.appendChild(
+                link
+            );
 
-        push32(
-            local,
-            data.length
-        );
+            link.click();
 
-        push32(
-            local,
-            data.length
-        );
+            link.remove();
 
-        push16(
-            local,
-            name.length
-        );
+            results.innerHTML =
+                "";
 
-        push16(
-            local,
-            0
-        );
+            addResult(
+                "Archivos extraídos",
+                extracted.files.length
+            );
 
-        for (
-            const byte
-            of name
-        ) {
+            addResult(
+                "Charts detectados",
+                extracted.charts.length
+            );
 
-            local.push(
-                byte
+            addResult(
+                "Proyecto",
+                "MissaWeb.zip ✅"
+            );
+
+            setStatus(
+                "✅ TERMINADO\n\n" +
+                `Archivos: ${
+                    extracted.files.length
+                }\n` +
+                `Charts: ${
+                    extracted.charts.length
+                }\n\n` +
+                "MissaWeb.zip descargado."
             );
         }
+        catch(error)
+        {
+            console.error(error);
 
-        for (
-            const byte
-            of data
-        ) {
-
-            local.push(
-                byte
+            setStatus(
+                "❌ ERROR\n\n" +
+                error.message
             );
         }
+        finally
+        {
+            analyzeButton.disabled =
+                false;
 
-        for (
-            const byte
-            of local
-        ) {
-
-            output.push(
-                byte
-            );
+            extractButton.disabled =
+                false;
         }
-
-
-        const entry = [];
-
-        push32(
-            entry,
-            0x02014B50
-        );
-
-        push16(entry, 20);
-        push16(entry, 20);
-        push16(entry, 0);
-        push16(entry, 0);
-        push16(entry, 0);
-        push16(entry, 0);
-
-        push32(
-            entry,
-            crc
-        );
-
-        push32(
-            entry,
-            data.length
-        );
-
-        push32(
-            entry,
-            data.length
-        );
-
-        push16(
-            entry,
-            name.length
-        );
-
-        push16(entry, 0);
-        push16(entry, 0);
-        push16(entry, 0);
-        push16(entry, 0);
-
-        push32(
-            entry,
-            0
-        );
-
-        push32(
-            entry,
-            offset
-        );
-
-        for (
-            const byte
-            of name
-        ) {
-
-            entry.push(
-                byte
-            );
-        }
-
-        central.push(
-            entry
-        );
-
-        offset +=
-            local.length;
     }
-
-
-    const centralOffset =
-        output.length;
-
-    let centralSize = 0;
-
-    for (
-        const entry
-        of central
-    ) {
-
-        for (
-            const byte
-            of entry
-        ) {
-
-            output.push(
-                byte
-            );
-        }
-
-        centralSize +=
-            entry.length;
-    }
-
-
-    push32(
-        output,
-        0x06054B50
-    );
-
-    push16(output, 0);
-    push16(output, 0);
-
-    push16(
-        output,
-        files.length
-    );
-
-    push16(
-        output,
-        files.length
-    );
-
-    push32(
-        output,
-        centralSize
-    );
-
-    push32(
-        output,
-        centralOffset
-    );
-
-    push16(
-        output,
-        0
-    );
-
-
-    return new Uint8Array(
-        output
-    );
-}
+);
+```
