@@ -1,3 +1,4 @@
+```css
 * {
     box-sizing: border-box;
 }
@@ -8,83 +9,126 @@ body {
     padding: 0;
 
     min-height: 100%;
-
-    font-family: Arial, sans-serif;
-
-    background: #101010;
-    color: white;
 }
 
 body {
-    display: flex;
-    justify-content: center;
+    min-height: 100vh;
 
-    padding: 40px 20px;
+    padding: 30px 15px;
+
+    background:
+        radial-gradient(
+            circle at top,
+            #292929,
+            #0b0b0b 70%
+        );
+
+    color: white;
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
 }
 
-.container {
+.app {
     width: 100%;
-    max-width: 850px;
+    max-width: 950px;
+
+    margin: auto;
+}
+
+header {
+    text-align: center;
+}
+
+header h1 {
+    margin: 0;
+
+    font-size:
+        clamp(34px, 7vw, 60px);
+}
+
+header p {
+    color: #aaa;
+
+    font-size: 17px;
+}
+
+.version {
+    display: inline-block;
+
+    margin-top: 8px;
+
+    padding: 7px 13px;
+
+    border-radius: 999px;
+
+    background: #252525;
+
+    color: #aaa;
+
+    font-family: monospace;
+}
+
+.card {
+    margin-top: 25px;
+
+    padding: 25px;
 
     background: #181818;
 
     border: 1px solid #333;
+
     border-radius: 20px;
 
-    padding: 35px;
-
     box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.4);
-}
-
-h1 {
-    margin-top: 0;
-
-    font-size: 42px;
-}
-
-p {
-    color: #aaa;
+        0 20px 60px
+        rgba(0,0,0,.45);
 }
 
 .drop-zone {
-    display: flex;
+    min-height: 240px;
 
+    display: flex;
     flex-direction: column;
+
     align-items: center;
     justify-content: center;
 
-    min-height: 220px;
-
-    margin-top: 30px;
+    gap: 10px;
 
     border: 3px dashed #555;
+
     border-radius: 18px;
+
+    background: #111;
 
     cursor: pointer;
 
     transition:
-        background 0.2s,
-        border-color 0.2s;
+        .2s;
 }
 
 .drop-zone:hover,
 .drop-zone.dragging {
     background: #222;
+
     border-color: white;
+
+    transform:
+        scale(1.01);
 }
 
-.drop-zone .big {
-    font-size: 60px;
-    margin-bottom: 15px;
+.drop-icon {
+    font-size: 65px;
 }
 
 .drop-zone strong {
-    font-size: 20px;
+    font-size: 21px;
 }
 
-.drop-zone span:not(.big) {
-    margin-top: 8px;
+.drop-zone span {
     color: #888;
 }
 
@@ -92,65 +136,147 @@ p {
     display: none;
 }
 
-button {
-    margin-top: 20px;
+.buttons {
+    display: flex;
 
-    padding: 14px 25px;
+    flex-wrap: wrap;
+
+    gap: 12px;
+
+    margin-top: 20px;
+}
+
+button {
+    flex: 1;
+
+    min-width: 220px;
+
+    padding: 15px;
 
     border: 0;
+
     border-radius: 10px;
 
+    background: white;
+
+    color: #111;
+
     font-size: 16px;
+
     font-weight: bold;
 
     cursor: pointer;
 }
 
-#convertButton {
-    margin-left: 10px;
-}
-
 button:disabled {
-    opacity: 0.4;
+    opacity: .4;
+
     cursor: not-allowed;
 }
 
+.progress {
+    width: 100%;
+
+    height: 10px;
+
+    margin-top: 20px;
+
+    overflow: hidden;
+
+    border-radius: 999px;
+
+    background: #303030;
+}
+
+#progressBar {
+    height: 100%;
+
+    width: 0%;
+
+    background: white;
+
+    transition:
+        width .15s;
+}
+
 #status {
-    margin-top: 25px;
+    min-height: 140px;
+
+    margin-top: 20px;
 
     padding: 18px;
 
-    background: #0b0b0b;
-
     border-radius: 12px;
+
+    background: #090909;
+
+    color: #ddd;
 
     white-space: pre-wrap;
 
-    font-family: monospace;
+    overflow-wrap: anywhere;
+
+    font-family:
+        "Courier New",
+        monospace;
 }
 
 #results {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(210px, 1fr)
+        );
+
+    gap: 12px;
+
     margin-top: 20px;
 }
 
 .result {
-    padding: 15px;
+    padding: 16px;
 
-    margin-top: 10px;
+    border-radius: 12px;
 
     background: #222;
 
-    border-radius: 10px;
+    border-left:
+        4px solid #777;
 }
 
-.good {
-    border-left: 4px solid #4caf50;
+.result.good {
+    border-left-color:
+        #4caf50;
 }
 
-.warn {
-    border-left: 4px solid #ff9800;
+.result.warn {
+    border-left-color:
+        #ff9800;
 }
 
-.bad {
-    border-left: 4px solid #f44336;
+.result-title {
+    font-weight: bold;
+
+    margin-bottom: 8px;
 }
+
+.result-value {
+    color: #bbb;
+
+    font-family: monospace;
+
+    white-space: pre-wrap;
+}
+
+footer {
+    margin-top: 20px;
+
+    color: #666;
+
+    text-align: center;
+
+    font-size: 13px;
+}
+```
