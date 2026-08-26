@@ -1,10 +1,15 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>FNF Web Converter V9</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>FNF Web Converter V10</title>
 
     <link rel="stylesheet" href="style.css">
 </head>
@@ -17,92 +22,39 @@
         <h1>🎵 FNF Web Converter</h1>
 
         <p>
-            Extrae recursos reales y prepara un proyecto web
+            ZIP completo del juego → análisis → proyecto web
         </p>
 
         <span class="version">
-            V9
+            V10 FULL ZIP
         </span>
     </header>
 
 
-    <!-- =====================================================
-         EXE → ZIP
-    ====================================================== -->
-
     <section class="card">
 
-        <h2>1️⃣ EXE → ZIP</h2>
+        <h2>📦 Cargar ZIP completo</h2>
 
         <p>
-            Extrae imágenes, audio, vídeo y datos
-            encontrados dentro del ejecutable.
+            Selecciona el ZIP completo que contiene
+            los archivos extraídos del juego.
         </p>
 
-        <label id="exeDrop" class="drop-zone">
+        <label
+            id="zipDrop"
+            class="drop-zone"
+        >
 
-            <div class="drop-icon">📦</div>
-
-            <strong>
-                Seleccionar EXE
-            </strong>
-
-            <span>
-                MissaMod.exe
-            </span>
-
-            <input
-                id="exeInput"
-                type="file"
-                accept=".exe"
-            >
-
-        </label>
-
-        <div class="buttons">
-
-            <button
-                id="exeAnalyze"
-                disabled
-            >
-                🔎 Analizar EXE
-            </button>
-
-            <button
-                id="exeExtract"
-                disabled
-            >
-                🚀 EXTRAER EXE
-            </button>
-
-        </div>
-
-    </section>
-
-
-    <!-- =====================================================
-         ZIP → HTML5
-    ====================================================== -->
-
-    <section class="card">
-
-        <h2>2️⃣ ZIP → HTML5</h2>
-
-        <p>
-            Usa el ZIP extraído para construir
-            un proyecto web basado en sus datos.
-        </p>
-
-        <label id="zipDrop" class="drop-zone">
-
-            <div class="drop-icon">📁</div>
+            <div class="drop-icon">
+                📁
+            </div>
 
             <strong>
                 Seleccionar ZIP
             </strong>
 
             <span>
-                MissaExtracted.zip
+                Puedes cargar el ZIP completo del juego
             </span>
 
             <input
@@ -116,17 +68,17 @@
         <div class="buttons">
 
             <button
-                id="zipAnalyze"
+                id="analyzeButton"
                 disabled
             >
-                🔎 Analizar ZIP
+                🔎 ANALIZAR TODO
             </button>
 
             <button
-                id="zipBuild"
+                id="buildButton"
                 disabled
             >
-                🌐 CONSTRUIR HTML5
+                🌐 GENERAR PROYECTO WEB
             </button>
 
         </div>
@@ -134,37 +86,49 @@
     </section>
 
 
-    <!-- =====================================================
-         ESTADO
-    ====================================================== -->
-
     <section class="card">
 
-        <h2>📊 Estado</h2>
+        <h2>📊 Análisis</h2>
 
         <div id="progressContainer">
             <div id="progressBar"></div>
         </div>
 
-        <pre id="status">✅ Página cargada.
-Selecciona un EXE o ZIP.</pre>
+        <pre id="status">Esperando ZIP...</pre>
 
         <div id="results"></div>
 
     </section>
 
 
+    <section
+        id="fileListCard"
+        class="card hidden"
+    >
+
+        <h2>📂 Archivos encontrados</h2>
+
+        <input
+            id="search"
+            type="search"
+            placeholder="Buscar archivo..."
+        >
+
+        <div id="fileList"></div>
+
+    </section>
+
+
     <footer>
-        El procesamiento del archivo ocurre localmente.
+        Todos los archivos del ZIP se conservan.
     </footer>
 
 </div>
 
 
-<!-- ZIP -->
 <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 
-<script src="./converter.js?v=9"></script>
+<script src="./converter.js?v=10"></script>
 
 </body>
 </html>
