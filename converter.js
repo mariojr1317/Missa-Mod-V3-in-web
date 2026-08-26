@@ -1007,8 +1007,54 @@ searchInput.addEventListener(
  RESULTADOS
 ============================================================ */
 
+function addResult(
+    title,
+    value,
+    good = true
+)
+{
+    const element =
+        document.createElement("div");
+
+    element.className =
+        `result ${good ? "good" : "warn"}`;
+
+    const titleElement =
+        document.createElement("div");
+
+    titleElement.className =
+        "result-title";
+
+    titleElement.textContent =
+        title;
+
+    const valueElement =
+        document.createElement("div");
+
+    valueElement.className =
+        "result-value";
+
+    valueElement.textContent =
+        String(value);
+
+    element.appendChild(
+        titleElement
+    );
+
+    element.appendChild(
+        valueElement
+    );
+
+    resultsBox.appendChild(
+        element
+    );
+}
+
+
 function displayAnalysis()
 {
+    // ...
+}
     resultsBox.innerHTML =
         "";
 
