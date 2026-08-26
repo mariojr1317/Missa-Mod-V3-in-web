@@ -2,78 +2,107 @@
 
 /*
 ============================================================
- FNF WEB CONVERTER V9
+ FNF WEB CONVERTER V10
 
- OBJETIVOS
+ FUENTE PRINCIPAL:
+     ZIP COMPLETO DEL JUEGO
 
- 1. EXE -> ZIP
-    Recuperar recursos binarios reconocibles.
+ REGLA:
+     NO ELIMINAR ARCHIVOS DESCONOCIDOS.
 
- 2. ZIP -> HTML5
-    Leer el ZIP ya extraído.
-    Clasificar sus archivos.
-    Detectar charts Psych Engine.
-    Crear un proyecto web que CONSERVE
-    los archivos originales.
+ EL PROGRAMA:
+
+ 1. Abre TODO el ZIP.
+ 2. Conserva todas las entradas.
+ 3. Clasifica archivos.
+ 4. Busca:
+      - canciones
+      - charts
+      - personajes
+      - stages
+      - eventos
+      - imágenes
+      - audio
+      - vídeos
+      - fuentes
+      - scripts
+      - shaders
+ 5. Muestra la lista completa.
+ 6. Genera un nuevo ZIP con:
+      - archivos originales
+      - manifest.json
+      - index.html
+      - game.js
+      - style.css
 
  IMPORTANTE:
- No se intenta convertir el código nativo
- del EXE directamente a JavaScript.
+ Esto todavía no convierte automáticamente el motor
+ compilado de Psych Engine. Primero estamos construyendo
+ un mapa completo y preservando todos sus datos.
 ============================================================
 */
 
 
-/* ============================================================
- ELEMENTOS
-============================================================ */
-
-const exeInput =
-    document.getElementById("exeInput");
-
-const exeDrop =
-    document.getElementById("exeDrop");
-
-const exeAnalyze =
-    document.getElementById("exeAnalyze");
-
-const exeExtract =
-    document.getElementById("exeExtract");
-
 const zipInput =
-    document.getElementById("zipInput");
+    document.getElementById(
+        "zipInput"
+    );
 
 const zipDrop =
-    document.getElementById("zipDrop");
+    document.getElementById(
+        "zipDrop"
+    );
 
-const zipAnalyze =
-    document.getElementById("zipAnalyze");
+const analyzeButton =
+    document.getElementById(
+        "analyzeButton"
+    );
 
-const zipBuild =
-    document.getElementById("zipBuild");
+const buildButton =
+    document.getElementById(
+        "buildButton"
+    );
 
 const statusBox =
-    document.getElementById("status");
+    document.getElementById(
+        "status"
+    );
 
 const resultsBox =
-    document.getElementById("results");
+    document.getElementById(
+        "results"
+    );
 
 const progressBar =
-    document.getElementById("progressBar");
+    document.getElementById(
+        "progressBar"
+    );
+
+const fileListCard =
+    document.getElementById(
+        "fileListCard"
+    );
+
+const fileList =
+    document.getElementById(
+        "fileList"
+    );
+
+const searchInput =
+    document.getElementById(
+        "search"
+    );
 
 
-/* ============================================================
- ESTADO
-============================================================ */
-
-let selectedExe = null;
 let selectedZip = null;
 
 let zipFiles = [];
-let zipAnalysis = null;
+
+let analysis = null;
 
 
 /* ============================================================
- UI
+ UTILIDADES
 ============================================================ */
 
 function setStatus(text)
@@ -96,70 +125,50 @@ function setProgress(value)
 }
 
 
-function clearResults()
+function formatBytes(bytes)
 {
-    resultsBox.innerHTML =
-        "";
+    if (
+        bytes < 1024
+    )
+    {
+        return `${bytes} B`;
+    }
+
+    if (
+        bytes <
+        1024 * 1024
+    )
+    {
+        return `${(
+            bytes /
+            1024
+        ).toFixed(2)} KB`;
+    }
+
+    if (
+        bytes <
+        1024 *
+        1024 *
+        1024
+    )
+    {
+        return `${(
+            bytes /
+            1024 /
+            1024
+        ).toFixed(2)} MB`;
+    }
+
+    return `${(
+        bytes /
+        1024 /
+        1024 /
+        1024
+    ).toFixed(2)} GB`;
 }
 
 
-function addResult(
-    title,
-    value,
-    good = true
-)
-{
-    const element =
-        document.createElement(
-            "div"
-        );
-
-    element.className =
-        `result ${
-            good
-                ? "good"
-                : "warn"
-        }`;
-
-    const titleElement =
-        document.createElement(
-            "div"
-        );
-
-    titleElement.className =
-        "result-title";
-
-    titleElement.textContent =
-        title;
-
-
-    const valueElement =
-        document.createElement(
-            "div"
-        );
-
-    valueElement.className =
-        "result-value";
-
-    valueElement.textContent =
-        String(value);
-
-
-    element.appendChild(
-        titleElement
-    );
-
-    element.appendChild(
-        valueElement
-    );
-
-    resultsBox.appendChild(
-        element
-    );
-}
-
-
-function escapePath(path)
+function cleanPath(path)
 {
     return String(path)
         .replaceAll(
@@ -177,781 +186,175 @@ function escapePath(path)
 }
 
 
-function formatBytes(bytes)
+function extension(path)
 {
-    if (
-        bytes < 1024
-    )
-    {
-        return `${bytes} B`;
-    }
+    const clean =
+        path
+            .toLowerCase()
+            .split("?")[0];
+
+    const dot =
+        clean.lastIndexOf(".");
 
     if (
-        bytes <
-        1024 * 1024
+        dot === -1
     )
     {
-        return `${
-            (
-                bytes /
-                1024
-            ).toFixed(2)
-        } KB`;
+        return "";
     }
 
-    if (
-        bytes <
-        1024 *
-        1024 *
-        1024
-    )
-    {
-        return `${
-            (
-                bytes /
-                1024 /
-                1024
-            ).toFixed(2)
-        } MB`;
-    }
-
-    return `${
-        (
-            bytes /
-            1024 /
-            1024 /
-            1024
-        ).toFixed(2)
-    } GB`;
-}
-
-
-/* ============================================================
- DRAG & DROP
-============================================================ */
-
-function setupDropZone(
-    zone,
-    input,
-    callback
-)
-{
-    zone.addEventListener(
-        "click",
-        () =>
-        {
-            input.click();
-        }
-    );
-
-
-    input.addEventListener(
-        "change",
-        () =>
-        {
-            if (
-                input.files.length
-            )
-            {
-                callback(
-                    input.files[0]
-                );
-            }
-        }
-    );
-
-
-    zone.addEventListener(
-        "dragover",
-        event =>
-        {
-            event.preventDefault();
-
-            zone.classList.add(
-                "dragging"
-            );
-        }
-    );
-
-
-    zone.addEventListener(
-        "dragleave",
-        () =>
-        {
-            zone.classList.remove(
-                "dragging"
-            );
-        }
-    );
-
-
-    zone.addEventListener(
-        "drop",
-        event =>
-        {
-            event.preventDefault();
-
-            zone.classList.remove(
-                "dragging"
-            );
-
-            if (
-                event.dataTransfer.files.length
-            )
-            {
-                callback(
-                    event.dataTransfer.files[0]
-                );
-            }
-        }
+    return clean.slice(
+        dot
     );
 }
 
 
 /* ============================================================
- EXE SELECTOR
+ DROP ZONE
 ============================================================ */
 
-setupDropZone(
-    exeDrop,
-    exeInput,
-    file =>
-    {
-        selectedExe =
-            file;
-
-        exeAnalyze.disabled =
-            false;
-
-        exeExtract.disabled =
-            true;
-
-        clearResults();
-
-        setProgress(0);
-
-        setStatus(
-            "📦 EXE seleccionado\n\n" +
-            `Nombre: ${
-                file.name
-            }\n` +
-            `Tamaño: ${
-                formatBytes(
-                    file.size
-                )
-            }\n\n` +
-            "Pulsa ANALIZAR EXE."
-        );
-    }
-);
-
-
-/* ============================================================
- ZIP SELECTOR
-============================================================ */
-
-setupDropZone(
-    zipDrop,
-    zipInput,
-    file =>
-    {
-        selectedZip =
-            file;
-
-        zipAnalyze.disabled =
-            false;
-
-        zipBuild.disabled =
-            true;
-
-        zipFiles =
-            [];
-
-        zipAnalysis =
-            null;
-
-        clearResults();
-
-        setProgress(0);
-
-        setStatus(
-            "📁 ZIP seleccionado\n\n" +
-            `Nombre: ${
-                file.name
-            }\n` +
-            `Tamaño: ${
-                formatBytes(
-                    file.size
-                )
-            }\n\n` +
-            "Pulsa ANALIZAR ZIP."
-        );
-    }
-);
-
-
-/* ============================================================
- BYTES / FIRMAS
-============================================================ */
-
-function ascii(text)
-{
-    return Uint8Array.from(
-        [...text].map(
-            char =>
-                char.charCodeAt(0)
-        )
-    );
-}
-
-
-function hasSignature(
-    data,
-    offset,
-    signature
-)
-{
-    if (
-        offset +
-        signature.length >
-        data.length
-    )
-    {
-        return false;
-    }
-
-    for (
-        let i = 0;
-        i < signature.length;
-        i++
-    )
-    {
-        if (
-            data[offset + i] !==
-            signature[i]
-        )
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-
-function findSignature(
-    data,
-    signature,
-    start = 0
-)
-{
-    for (
-        let i = start;
-        i +
-            signature.length <=
-            data.length;
-        i++
-    )
-    {
-        if (
-            hasSignature(
-                data,
-                i,
-                signature
-            )
-        )
-        {
-            return i;
-        }
-    }
-
-    return -1;
-}
-
-
-function readU32LE(
-    data,
-    offset
-)
-{
-    if (
-        offset + 4 >
-        data.length
-    )
-    {
-        return 0;
-    }
-
-    return (
-        data[offset] |
-        (
-            data[offset + 1]
-            << 8
-        ) |
-        (
-            data[offset + 2]
-            << 16
-        ) |
-        (
-            data[offset + 3]
-            << 24
-        )
-    ) >>> 0;
-}
-
-
-function readU32BE(
-    data,
-    offset
-)
-{
-    if (
-        offset + 4 >
-        data.length
-    )
-    {
-        return 0;
-    }
-
-    return (
-        (
-            data[offset]
-            << 24
-        ) >>> 0
-    ) |
-    (
-        data[offset + 1]
-        << 16
-    ) |
-    (
-        data[offset + 2]
-        << 8
-    ) |
-    data[offset + 3];
-}
-
-
-function containsText(
-    data,
-    text
-)
-{
-    return (
-        findSignature(
-            data,
-            ascii(text)
-        ) !== -1
-    );
-}
-
-
-/* ============================================================
- EXE ANALYSIS
-============================================================ */
-
-function analyzeEXE(
-    data
-)
-{
-    const pe =
-        data.length >= 2 &&
-        data[0] === 0x4D &&
-        data[1] === 0x5A;
-
-
-    const fnf =
-        containsText(
-            data,
-            "Friday Night Funkin"
-        ) ||
-        containsText(
-            data,
-            "funkin"
-        ) ||
-        containsText(
-            data,
-            "FNF"
-        );
-
-
-    const psych =
-        containsText(
-            data,
-            "Psych Engine"
-        ) ||
-        containsText(
-            data,
-            "PsychEngine"
-        );
-
-
-    const flixel =
-        containsText(
-            data,
-            "HaxeFlixel"
-        ) ||
-        containsText(
-            data,
-            "flixel"
-        );
-
-
-    return {
-        pe,
-        fnf,
-        psych,
-        flixel
-    };
-}
-
-
-/* ============================================================
- EXE ANALYZE BUTTON
-============================================================ */
-
-exeAnalyze.addEventListener(
+zipDrop.addEventListener(
     "click",
-    async () =>
+    () =>
+    {
+        zipInput.click();
+    }
+);
+
+
+zipInput.addEventListener(
+    "change",
+    () =>
     {
         if (
-            !selectedExe
+            zipInput.files.length
         )
         {
-            return;
-        }
-
-        exeAnalyze.disabled =
-            true;
-
-        exeExtract.disabled =
-            true;
-
-
-        try
-        {
-            setStatus(
-                "📥 Cargando EXE..."
+            selectZip(
+                zipInput.files[0]
             );
-
-            setProgress(20);
-
-            const buffer =
-                await selectedExe.arrayBuffer();
-
-            const data =
-                new Uint8Array(
-                    buffer
-                );
-
-            setStatus(
-                "🔎 Analizando..."
-            );
-
-            const analysis =
-                analyzeEXE(
-                    data
-                );
-
-            setProgress(100);
-
-            clearResults();
-
-            addResult(
-                "Archivo",
-                selectedExe.name
-            );
-
-            addResult(
-                "Tamaño",
-                formatBytes(
-                    selectedExe.size
-                )
-            );
-
-            addResult(
-                "PE",
-                analysis.pe
-                    ? "✅ Detectado"
-                    : "❌ No detectado",
-                analysis.pe
-            );
-
-            addResult(
-                "FNF",
-                analysis.fnf
-                    ? "✅ Detectado"
-                    : "⚠️ No confirmado",
-                analysis.fnf
-            );
-
-            addResult(
-                "Psych Engine",
-                analysis.psych
-                    ? "✅ Detectado"
-                    : "⚠️ No confirmado",
-                analysis.psych
-            );
-
-            addResult(
-                "HaxeFlixel",
-                analysis.flixel
-                    ? "✅ Detectado"
-                    : "⚠️ No confirmado",
-                analysis.flixel
-            );
-
-            exeExtract.disabled =
-                false;
-
-            setStatus(
-                "✅ EXE analizado.\n\n" +
-                "Ya puedes pulsar EXTRAER EXE."
-            );
-        }
-        catch(error)
-        {
-            console.error(error);
-
-            setStatus(
-                "❌ Error analizando EXE:\n\n" +
-                error.message
-            );
-        }
-        finally
-        {
-            exeAnalyze.disabled =
-                false;
         }
     }
 );
 
 
-/* ============================================================
- PNG
-============================================================ */
+zipDrop.addEventListener(
+    "dragover",
+    event =>
+    {
+        event.preventDefault();
 
-function extractPNG(
-    data,
-    start
-)
-{
-    const endMarker =
-        ascii("IEND");
+        zipDrop.classList.add(
+            "dragging"
+        );
+    }
+);
 
-    const marker =
-        findSignature(
-            data,
-            endMarker,
-            start + 8
+
+zipDrop.addEventListener(
+    "dragleave",
+    () =>
+    {
+        zipDrop.classList.remove(
+            "dragging"
+        );
+    }
+);
+
+
+zipDrop.addEventListener(
+    "drop",
+    event =>
+    {
+        event.preventDefault();
+
+        zipDrop.classList.remove(
+            "dragging"
         );
 
-    if (
-        marker === -1
-    )
-    {
-        return null;
+        if (
+            event.dataTransfer.files.length
+        )
+        {
+            selectZip(
+                event.dataTransfer.files[0]
+            );
+        }
     }
+);
 
-    return data.slice(
-        start,
-        marker + 8
+
+function selectZip(file)
+{
+    selectedZip =
+        file;
+
+    analyzeButton.disabled =
+        false;
+
+    buildButton.disabled =
+        true;
+
+    zipFiles =
+        [];
+
+    analysis =
+        null;
+
+    resultsBox.innerHTML =
+        "";
+
+    fileList.innerHTML =
+        "";
+
+    fileListCard.classList.add(
+        "hidden"
+    );
+
+    setProgress(0);
+
+    setStatus(
+        "📦 ZIP seleccionado\n\n" +
+        `Nombre: ${file.name}\n` +
+        `Tamaño: ${formatBytes(
+            file.size
+        )}\n\n` +
+        "Pulsa ANALIZAR TODO."
     );
 }
 
 
 /* ============================================================
- JPEG
+ LEER ZIP COMPLETO
 ============================================================ */
 
-function extractJPEG(
-    data,
-    start
-)
+async function readFullZip(file)
 {
-    for (
-        let i = start + 3;
-        i + 1 < data.length;
-        i++
-    )
-    {
-        if (
-            data[i] === 0xFF &&
-            data[i + 1] === 0xD9
-        )
-        {
-            return data.slice(
-                start,
-                i + 2
-            );
-        }
-    }
+    const buffer =
+        await file.arrayBuffer();
 
-    return null;
-}
-
-
-/* ============================================================
- RIFF
-============================================================ */
-
-function extractRIFF(
-    data,
-    start,
-    type
-)
-{
-    if (
-        !hasSignature(
-            data,
-            start,
-            ascii("RIFF")
-        )
-    )
-    {
-        return null;
-    }
-
-    if (
-        !hasSignature(
-            data,
-            start + 8,
-            ascii(type)
-        )
-    )
-    {
-        return null;
-    }
-
-    const size =
-        readU32LE(
-            data,
-            start + 4
+    const bytes =
+        new Uint8Array(
+            buffer
         );
 
-    const end =
-        start +
-        8 +
-        size;
+    const result =
+        fflate.unzipSync(
+            bytes
+        );
 
-    if (
-        end <= start ||
-        end > data.length
+    return Object.entries(
+        result
     )
-    {
-        return null;
-    }
+    .map(
+        ([name, data]) =>
+        ({
+            name:
+                cleanPath(name),
 
-    return data.slice(
-        start,
-        end
+            data
+        })
     );
-}
-
-
-/* ============================================================
- OGG
-============================================================ */
-
-function extractOGG(
-    data,
-    start
-)
-{
-    let position =
-        start;
-
-    while (
-        position + 27 <=
-        data.length
-    )
-    {
-        if (
-            !hasSignature(
-                data,
-                position,
-                [
-                    0x4F,
-                    0x67,
-                    0x67,
-                    0x53
-                ]
-            )
-        )
-        {
-            return null;
-        }
-
-        const headerType =
-            data[
-                position + 5
-            ];
-
-        const segments =
-            data[
-                position + 26
-            ];
-
-        const tableStart =
-            position + 27;
-
-        const payloadStart =
-            tableStart +
-            segments;
-
-        if (
-            payloadStart >
-            data.length
-        )
-        {
-            return null;
-        }
-
-        let payloadSize =
-            0;
-
-        for (
-            let i = 0;
-            i < segments;
-            i++
-        )
-        {
-            payloadSize +=
-                data[
-                    tableStart + i
-                ];
-        }
-
-        const pageEnd =
-            payloadStart +
-            payloadSize;
-
-        if (
-            pageEnd >
-            data.length
-        )
-        {
-            return null;
-        }
-
-        /*
-         * OggS header type 0x04 = EOS.
-         */
-
-        if (
-            headerType & 0x04
-        )
-        {
-            return data.slice(
-                start,
-                pageEnd
-            );
-        }
-
-        position =
-            pageEnd;
-    }
-
-    return null;
 }
 
 
@@ -959,137 +362,43 @@ function extractOGG(
  JSON
 ============================================================ */
 
-function extractJSONObject(
-    data,
-    start
-)
+function decodeUTF8(data)
 {
-    if (
-        data[start] !== 0x7B
-    )
+    try
+    {
+        return new TextDecoder(
+            "utf-8"
+        ).decode(
+            data
+        );
+    }
+    catch
+    {
+        return "";
+    }
+}
+
+
+function parseJSON(data)
+{
+    try
+    {
+        return JSON.parse(
+            decodeUTF8(data)
+        );
+    }
+    catch
     {
         return null;
     }
-
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-
-    const limit =
-        Math.min(
-            data.length,
-            start +
-            16 * 1024 * 1024
-        );
-
-
-    for (
-        let i = start;
-        i < limit;
-        i++
-    )
-    {
-        const byte =
-            data[i];
-
-        if (
-            inString
-        )
-        {
-            if (
-                escaped
-            )
-            {
-                escaped = false;
-            }
-            else if (
-                byte === 0x5C
-            )
-            {
-                escaped = true;
-            }
-            else if (
-                byte === 0x22
-            )
-            {
-                inString = false;
-            }
-
-            continue;
-        }
-
-        if (
-            byte === 0x22
-        )
-        {
-            inString = true;
-
-            continue;
-        }
-
-        if (
-            byte === 0x7B
-        )
-        {
-            depth++;
-        }
-        else if (
-            byte === 0x7D
-        )
-        {
-            depth--;
-
-            if (
-                depth === 0
-            )
-            {
-                const raw =
-                    data.slice(
-                        start,
-                        i + 1
-                    );
-
-                try
-                {
-                    const text =
-                        new TextDecoder(
-                            "utf-8"
-                        ).decode(
-                            raw
-                        );
-
-                    return {
-                        data:
-                            raw,
-
-                        object:
-                            JSON.parse(
-                                text
-                            ),
-
-                        end:
-                            i + 1
-                    };
-                }
-                catch
-                {
-                    return null;
-                }
-            }
-        }
-    }
-
-    return null;
 }
 
 
 /* ============================================================
- CHART DETECTOR
+ DETECTAR CHART
 ============================================================ */
 
-function isPsychChart(
-    object
-)
+function isPsychChart(object)
 {
     if (
         !object ||
@@ -1128,9 +437,7 @@ function isPsychChart(
 }
 
 
-function chartSongName(
-    object
-)
+function getSongName(object)
 {
     if (
         object &&
@@ -1149,62 +456,34 @@ function chartSongName(
 
 
 /* ============================================================
- ZIP ANALYSIS
+ CLASIFICAR ZIP
 ============================================================ */
 
-async function readZIP(
-    file
-)
+function analyzeZipFiles(files)
 {
-    const buffer =
-        await file.arrayBuffer();
-
-    const bytes =
-        new Uint8Array(
-            buffer
-        );
-
-    /*
-     * fflate está cargado desde index.html.
-     */
-
     const result =
-        fflate.unzipSync(
-            bytes
-        );
-
-    return Object.entries(
-        result
-    )
-    .map(
-        ([name, data]) =>
-        ({
-            name,
-            data
-        })
-    );
-}
-
-
-function analyzeZIP(
-    files
-)
-{
-    const analysis =
     {
         total: 0,
 
         images: [],
         audio: [],
         videos: [],
+        fonts: [],
         json: [],
-        lua: [],
-        text: [],
-
         charts: [],
+        lua: [],
+        scripts: [],
+        shaders: [],
+        text: [],
+        archives: [],
+        other: [],
+
         characters: [],
         stages: [],
-        events: []
+        songs: [],
+        events: [],
+
+        totalBytes: 0
     };
 
 
@@ -1221,87 +500,104 @@ function analyzeZIP(
             continue;
         }
 
-        const name =
-            escapePath(
-                file.name
-            );
+
+        const path =
+            file.name;
 
         const lower =
-            name.toLowerCase();
+            path.toLowerCase();
 
-        analysis.total++;
+        const ext =
+            extension(path);
+
+
+        result.total++;
+
+        result.totalBytes +=
+            file.data.length;
 
 
         /*
-         * Imágenes
+         * IMÁGENES
          */
 
         if (
-            /\.(png|jpg|jpeg|webp|bmp)$/i
-                .test(lower)
+            [
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".webp",
+                ".bmp",
+                ".gif"
+            ]
+            .includes(ext)
         )
         {
-            analysis.images.push(
-                name
+            result.images.push(
+                path
             );
         }
 
 
         /*
-         * Audio
+         * AUDIO
          */
 
-        if (
-            /\.(ogg|mp3|wav|m4a|aac)$/i
-                .test(lower)
+        else if (
+            [
+                ".ogg",
+                ".mp3",
+                ".wav",
+                ".m4a",
+                ".aac",
+                ".flac"
+            ]
+            .includes(ext)
         )
         {
-            analysis.audio.push(
-                name
+            result.audio.push(
+                path
             );
         }
 
 
         /*
-         * Vídeo
+         * VÍDEO
          */
 
-        if (
-            /\.(mp4|webm|mov|avi)$/i
-                .test(lower)
+        else if (
+            [
+                ".mp4",
+                ".webm",
+                ".mov",
+                ".avi",
+                ".mkv"
+            ]
+            .includes(ext)
         )
         {
-            analysis.videos.push(
-                name
+            result.videos.push(
+                path
             );
         }
 
 
         /*
-         * Lua
+         * FUENTES
          */
 
-        if (
-            lower.endsWith(".lua")
+        else if (
+            [
+                ".ttf",
+                ".otf",
+                ".woff",
+                ".woff2"
+            ]
+            .includes(ext)
         )
         {
-            analysis.lua.push(
-                name
-            );
-        }
-
-
-        /*
-         * TXT/XML/etc.
-         */
-
-        if (
-            /\.(txt|xml|cfg|ini)$/i
-                .test(lower)
-        )
-        {
-            analysis.text.push(
-                name
+            result.fonts.push(
+                path
             );
         }
 
@@ -1310,12 +606,12 @@ function analyzeZIP(
          * JSON
          */
 
-        if (
-            lower.endsWith(".json")
+        else if (
+            ext === ".json"
         )
         {
-            analysis.json.push(
-                name
+            result.json.push(
+                path
             );
 
             const object =
@@ -1323,24 +619,46 @@ function analyzeZIP(
                     file.data
                 );
 
+
             if (
                 isPsychChart(
                     object
                 )
             )
             {
-                analysis.charts.push(
+                result.charts.push(
                 {
                     file:
-                        name,
+                        path,
 
                     song:
-                        chartSongName(
+                        getSongName(
+                            object
+                        ),
+
+                    bpm:
+                        object.song &&
+                        object.song.bpm
+                            ? object.song.bpm
+                            : null,
+
+                    speed:
+                        object.song &&
+                        object.song.speed
+                            ? object.song.speed
+                            : null,
+
+                    noteCount:
+                        countChartNotes(
                             object
                         )
                 });
             }
 
+
+            /*
+             * Personajes
+             */
 
             if (
                 lower.includes(
@@ -1348,11 +666,15 @@ function analyzeZIP(
                 )
             )
             {
-                analysis.characters.push(
-                    name
+                result.characters.push(
+                    path
                 );
             }
 
+
+            /*
+             * Stages
+             */
 
             if (
                 lower.includes(
@@ -1360,15 +682,159 @@ function analyzeZIP(
                 )
             )
             {
-                analysis.stages.push(
-                    name
+                result.stages.push(
+                    path
                 );
             }
         }
 
 
         /*
-         * Custom events
+         * LUA
+         */
+
+        else if (
+            ext === ".lua"
+        )
+        {
+            result.lua.push(
+                path
+            );
+
+
+            if (
+                lower.includes(
+                    "custom_events"
+                ) ||
+                lower.includes(
+                    "events"
+                )
+            )
+            {
+                result.events.push(
+                    path
+                );
+            }
+        }
+
+
+        /*
+         * OTROS SCRIPTS
+         */
+
+        else if (
+            [
+                ".hx",
+                ".hscript",
+                ".js",
+                ".ts"
+            ]
+            .includes(ext)
+        )
+        {
+            result.scripts.push(
+                path
+            );
+        }
+
+
+        /*
+         * SHADERS
+         */
+
+        else if (
+            [
+                ".frag",
+                ".vert",
+                ".glsl",
+                ".shader"
+            ]
+            .includes(ext)
+        )
+        {
+            result.shaders.push(
+                path
+            );
+        }
+
+
+        /*
+         * TEXTO
+         */
+
+        else if (
+            [
+                ".txt",
+                ".xml",
+                ".cfg",
+                ".ini",
+                ".csv"
+            ]
+            .includes(ext)
+        )
+        {
+            result.text.push(
+                path
+            );
+        }
+
+
+        /*
+         * ARCHIVOS COMPRIMIDOS
+         */
+
+        else if (
+            [
+                ".zip",
+                ".pak",
+                ".pck",
+                ".7z"
+            ]
+            .includes(ext)
+        )
+        {
+            result.archives.push(
+                path
+            );
+        }
+
+
+        /*
+         * OTROS
+         */
+
+        else
+        {
+            result.other.push(
+                path
+            );
+        }
+
+
+        /*
+         * SONGS
+         */
+
+        if (
+            lower.includes(
+                "/songs/"
+            ) ||
+            lower.includes(
+                "\\songs\\"
+            ) ||
+            lower.includes(
+                "/song/"
+            )
+        )
+        {
+            result.songs.push(
+                path
+            );
+        }
+
+
+        /*
+         * EVENTOS
          */
 
         if (
@@ -1376,44 +842,317 @@ function analyzeZIP(
                 "custom_events"
             ) ||
             lower.includes(
-                "events"
+                "/events/"
             )
         )
         {
-            analysis.events.push(
-                name
-            );
+            if (
+                !result.events.includes(
+                    path
+                )
+            )
+            {
+                result.events.push(
+                    path
+                );
+            }
         }
     }
 
-    return analysis;
+
+    return result;
 }
 
 
-function parseJSON(
-    data
+function countChartNotes(object)
+{
+    let total = 0;
+
+    if (
+        !object ||
+        !object.song ||
+        !Array.isArray(
+            object.song.notes
+        )
+    )
+    {
+        return total;
+    }
+
+    for (
+        const section
+        of object.song.notes
+    )
+    {
+        if (
+            Array.isArray(
+                section.sectionNotes
+            )
+        )
+        {
+            total +=
+                section.sectionNotes.length;
+        }
+    }
+
+    return total;
+}
+
+
+/* ============================================================
+ MOSTRAR ARCHIVOS
+============================================================ */
+
+function renderFileList(
+    filter = ""
 )
 {
-    try
+    const normalized =
+        filter
+            .trim()
+            .toLowerCase();
+
+    fileList.innerHTML =
+        "";
+
+    const visible =
+        zipFiles.filter(
+            file =>
+                !normalized ||
+                file.name
+                    .toLowerCase()
+                    .includes(
+                        normalized
+                    )
+        );
+
+
+    const fragment =
+        document.createDocumentFragment();
+
+
+    for (
+        const file
+        of visible
+    )
     {
-        return JSON.parse(
-            new TextDecoder(
-                "utf-8"
-            ).decode(data)
+        const div =
+            document.createElement(
+                "div"
+            );
+
+        div.className =
+            "file-entry";
+
+
+        const ext =
+            extension(
+                file.name
+            );
+
+
+        const size =
+            formatBytes(
+                file.data.length
+            );
+
+
+        div.textContent =
+            `${file.name}  (${size})`;
+
+
+        if (ext)
+        {
+            const badge =
+                document.createElement(
+                    "span"
+                );
+
+            badge.className =
+                "file-type";
+
+            badge.textContent =
+                ext;
+
+            div.appendChild(
+                badge
+            );
+        }
+
+
+        fragment.appendChild(
+            div
         );
     }
-    catch
+
+
+    fileList.appendChild(
+        fragment
+    );
+}
+
+
+searchInput.addEventListener(
+    "input",
+    () =>
     {
-        return null;
+        renderFileList(
+            searchInput.value
+        );
+    }
+);
+
+
+/* ============================================================
+ RESULTADOS
+============================================================ */
+
+function displayAnalysis()
+{
+    resultsBox.innerHTML =
+        "";
+
+
+    addResult(
+        "Archivos totales",
+        analysis.total
+    );
+
+
+    addResult(
+        "Tamaño total",
+        formatBytes(
+            analysis.totalBytes
+        )
+    );
+
+
+    addResult(
+        "Imágenes",
+        analysis.images.length
+    );
+
+
+    addResult(
+        "Audio",
+        analysis.audio.length
+    );
+
+
+    addResult(
+        "Vídeos",
+        analysis.videos.length
+    );
+
+
+    addResult(
+        "Fuentes",
+        analysis.fonts.length
+    );
+
+
+    addResult(
+        "JSON",
+        analysis.json.length
+    );
+
+
+    addResult(
+        "Charts",
+        analysis.charts.length
+    );
+
+
+    addResult(
+        "Lua",
+        analysis.lua.length
+    );
+
+
+    addResult(
+        "Scripts",
+        analysis.scripts.length
+    );
+
+
+    addResult(
+        "Shaders",
+        analysis.shaders.length
+    );
+
+
+    addResult(
+        "Texto",
+        analysis.text.length
+    );
+
+
+    addResult(
+        "Archivos empaquetados",
+        analysis.archives.length
+    );
+
+
+    addResult(
+        "Otros",
+        analysis.other.length
+    );
+
+
+    addResult(
+        "Personajes",
+        analysis.characters.length
+    );
+
+
+    addResult(
+        "Stages",
+        analysis.stages.length
+    );
+
+
+    addResult(
+        "Songs",
+        analysis.songs.length
+    );
+
+
+    addResult(
+        "Eventos",
+        analysis.events.length
+    );
+
+
+    if (
+        analysis.charts.length
+    )
+    {
+        addResult(
+            "Charts encontrados",
+            analysis.charts
+                .slice(
+                    0,
+                    30
+                )
+                .map(
+                    chart =>
+                    `${chart.song} | ${
+                        chart.file
+                    } | ${
+                        chart.noteCount
+                    } notas`
+                )
+                .join("\n")
+        );
     }
 }
 
 
 /* ============================================================
- ZIP ANALYZE BUTTON
+ ANALIZAR TODO
 ============================================================ */
 
-zipAnalyze.addEventListener(
+analyzeButton.addEventListener(
     "click",
     async () =>
     {
@@ -1424,328 +1163,90 @@ zipAnalyze.addEventListener(
             return;
         }
 
-        zipAnalyze.disabled =
+
+        analyzeButton.disabled =
             true;
 
-        zipBuild.disabled =
+        buildButton.disabled =
             true;
+
 
         try
         {
             setStatus(
-                "📦 Abriendo ZIP..."
+                "📦 Abriendo TODO el ZIP..."
             );
 
             setProgress(10);
 
+
             zipFiles =
-                await readZIP(
+                await readFullZip(
                     selectedZip
                 );
 
-            setProgress(50);
 
-            zipAnalysis =
-                analyzeZIP(
+            setProgress(55);
+
+
+            setStatus(
+                "🧠 Analizando cada archivo..."
+            );
+
+
+            analysis =
+                analyzeZipFiles(
                     zipFiles
                 );
 
-            setProgress(100);
-
-            clearResults();
-
-            addResult(
-                "Archivos",
-                zipAnalysis.total
-            );
-
-            addResult(
-                "Imágenes",
-                zipAnalysis.images.length
-            );
-
-            addResult(
-                "Audio",
-                zipAnalysis.audio.length
-            );
-
-            addResult(
-                "Vídeos",
-                zipAnalysis.videos.length
-            );
-
-            addResult(
-                "JSON",
-                zipAnalysis.json.length
-            );
-
-            addResult(
-                "Charts Psych Engine",
-                zipAnalysis.charts.length
-            );
-
-            addResult(
-                "Lua",
-                zipAnalysis.lua.length
-            );
-
-            addResult(
-                "Personajes",
-                zipAnalysis.characters.length
-            );
-
-            addResult(
-                "Stages",
-                zipAnalysis.stages.length
-            );
-
-            addResult(
-                "Eventos",
-                zipAnalysis.events.length
-            );
-
-
-            if (
-                zipAnalysis.charts.length
-            )
-            {
-                addResult(
-                    "Charts",
-                    zipAnalysis.charts
-                        .slice(
-                            0,
-                            20
-                        )
-                        .map(
-                            chart =>
-                                `${chart.song} → ${chart.file}`
-                        )
-                        .join("\n")
-                );
-            }
-
-
-            zipBuild.disabled =
-                false;
-
-            setStatus(
-                "✅ ZIP analizado.\n\n" +
-                "Ahora puedes pulsar " +
-                "CONSTRUIR HTML5."
-            );
-        }
-        catch(error)
-        {
-            console.error(error);
-
-            setStatus(
-                "❌ No se pudo abrir el ZIP:\n\n" +
-                error.message
-            );
-        }
-        finally
-        {
-            zipAnalyze.disabled =
-                false;
-        }
-    }
-);
-
-
-/* ============================================================
- EXE EXTRACT
-============================================================ */
-
-exeExtract.addEventListener(
-    "click",
-    async () =>
-    {
-        if (
-            !selectedExe
-        )
-        {
-            setStatus(
-                "❌ Primero selecciona un EXE."
-            );
-
-            return;
-        }
-
-        exeExtract.disabled =
-            true;
-
-        exeAnalyze.disabled =
-            true;
-
-
-        try
-        {
-            setStatus(
-                "📥 Cargando EXE...\n\n" +
-                "Esto puede tardar porque " +
-                "el archivo es grande."
-            );
-
-            setProgress(5);
-
-            const buffer =
-                await selectedExe.arrayBuffer();
-
-            const data =
-                new Uint8Array(
-                    buffer
-                );
-
-            setProgress(15);
-
-
-            const extracted =
-                await extractEmbeddedResources(
-                    data
-                );
 
             setProgress(90);
 
 
-            const zipObject = {};
+            displayAnalysis();
 
 
-            /*
-             * Guardar recursos reales.
-             */
-
-            for (
-                const file
-                of extracted
-            )
-            {
-                zipObject[
-                    file.path
-                ] =
-                    file.data;
-            }
-
-
-            /*
-             * Manifest.
-             */
-
-            const manifest =
-            {
-                source:
-                {
-                    file:
-                        selectedExe.name,
-
-                    size:
-                        selectedExe.size
-                },
-
-                files:
-                    extracted.map(
-                        file =>
-                        ({
-                            path:
-                                file.path,
-
-                            type:
-                                file.type,
-
-                            size:
-                                file.data.length,
-
-                            offset:
-                                file.offset
-                        })
-                    )
-            };
-
-
-            zipObject[
-                "manifest.json"
-            ] =
-                new TextEncoder()
-                    .encode(
-                        JSON.stringify(
-                            manifest,
-                            null,
-                            4
-                        )
-                    );
-
-
-            setStatus(
-                "📦 Generando MissaExtracted.zip..."
+            fileListCard.classList.remove(
+                "hidden"
             );
 
 
-            /*
-             * Sin compresión para ahorrar RAM.
-             */
-
-            const zip =
-                fflate.zipSync(
-                    zipObject,
-                    {
-                        level: 0
-                    }
-                );
-
-
-            const blob =
-                new Blob(
-                    [zip],
-                    {
-                        type:
-                            "application/zip"
-                    }
-                );
-
-
-            downloadBlob(
-                blob,
-                "MissaExtracted.zip"
-            );
+            renderFileList();
 
 
             setProgress(100);
 
-            clearResults();
 
-            addResult(
-                "Archivos extraídos",
-                extracted.length
-            );
-
-            addResult(
-                "ZIP",
-                "MissaExtracted.zip"
-            );
+            buildButton.disabled =
+                false;
 
 
             setStatus(
-                "✅ EXTRACCIÓN TERMINADA\n\n" +
-                `Recursos recuperados: ${
-                    extracted.length
+                "✅ ANÁLISIS COMPLETO\n\n" +
+                `Archivos encontrados: ${
+                    analysis.total
+                }\n` +
+                `Tamaño: ${
+                    formatBytes(
+                        analysis.totalBytes
+                    )
                 }\n\n` +
-                "Se descargó MissaExtracted.zip."
+                "Se conservaron todos los archivos."
             );
         }
         catch(error)
         {
             console.error(error);
 
+
             setStatus(
-                "❌ ERROR EXTRAYENDO EXE:\n\n" +
+                "❌ ERROR LEYENDO ZIP\n\n" +
                 error.message
             );
         }
         finally
         {
-            exeExtract.disabled =
-                false;
-
-            exeAnalyze.disabled =
+            analyzeButton.disabled =
                 false;
         }
     }
@@ -1753,618 +1254,35 @@ exeExtract.addEventListener(
 
 
 /* ============================================================
- EXE RESOURCE EXTRACTION
+ CONSTRUIR PROYECTO
 ============================================================ */
 
-async function extractEmbeddedResources(
-    data
-)
-{
-    const files = [];
-
-    let imageIndex = 0;
-    let audioIndex = 0;
-    let videoIndex = 0;
-    let jsonIndex = 0;
-
-
-    /*
-     * --------------------------------------------------------
-     * PNG
-     * --------------------------------------------------------
-     */
-
-    setStatus(
-        "🖼️ Extrayendo PNG..."
-    );
-
-    const png =
-    [
-        0x89,
-        0x50,
-        0x4E,
-        0x47,
-        0x0D,
-        0x0A,
-        0x1A,
-        0x0A
-    ];
-
-    let position = 0;
-
-    while (true)
-    {
-        const found =
-            findSignature(
-                data,
-                png,
-                position
-            );
-
-        if (
-            found === -1
-        )
-        {
-            break;
-        }
-
-        const extracted =
-            extractPNG(
-                data,
-                found
-            );
-
-        if (
-            extracted
-        )
-        {
-            imageIndex++;
-
-            files.push(
-            {
-                path:
-                    `images/image_${imageIndex}.png`,
-
-                data:
-                    extracted,
-
-                type:
-                    "PNG",
-
-                offset:
-                    found
-            });
-
-            position =
-                found +
-                extracted.length;
-        }
-        else
-        {
-            position =
-                found + png.length;
-        }
-    }
-
-
-    /*
-     * --------------------------------------------------------
-     * JPEG
-     * --------------------------------------------------------
-     */
-
-    setStatus(
-        "🖼️ Extrayendo JPEG..."
-    );
-
-    const jpeg =
-    [
-        0xFF,
-        0xD8,
-        0xFF
-    ];
-
-    position = 0;
-
-    while (true)
-    {
-        const found =
-            findSignature(
-                data,
-                jpeg,
-                position
-            );
-
-        if (
-            found === -1
-        )
-        {
-            break;
-        }
-
-        const extracted =
-            extractJPEG(
-                data,
-                found
-            );
-
-        if (
-            extracted
-        )
-        {
-            imageIndex++;
-
-            files.push(
-            {
-                path:
-                    `images/image_${imageIndex}.jpg`,
-
-                data:
-                    extracted,
-
-                type:
-                    "JPEG",
-
-                offset:
-                    found
-            });
-
-            position =
-                found +
-                extracted.length;
-        }
-        else
-        {
-            position =
-                found + jpeg.length;
-        }
-    }
-
-
-    /*
-     * --------------------------------------------------------
-     * WAV / WEBP
-     * --------------------------------------------------------
-     */
-
-    setStatus(
-        "🔊 Extrayendo WAV / WEBP..."
-    );
-
-    const riff =
-        ascii("RIFF");
-
-    position = 0;
-
-    while (true)
-    {
-        const found =
-            findSignature(
-                data,
-                riff,
-                position
-            );
-
-        if (
-            found === -1
-        )
-        {
-            break;
-        }
-
-
-        if (
-            hasSignature(
-                data,
-                found + 8,
-                ascii("WAVE")
-            )
-        )
-        {
-            const extracted =
-                extractRIFF(
-                    data,
-                    found,
-                    "WAVE"
-                );
-
-            if (
-                extracted
-            )
-            {
-                audioIndex++;
-
-                files.push(
-                {
-                    path:
-                        `audio/audio_${audioIndex}.wav`,
-
-                    data:
-                        extracted,
-
-                    type:
-                        "WAV",
-
-                    offset:
-                        found
-                });
-
-                position =
-                    found +
-                    extracted.length;
-
-                continue;
-            }
-        }
-
-
-        if (
-            hasSignature(
-                data,
-                found + 8,
-                ascii("WEBP")
-            )
-        )
-        {
-            const extracted =
-                extractRIFF(
-                    data,
-                    found,
-                    "WEBP"
-                );
-
-            if (
-                extracted
-            )
-            {
-                imageIndex++;
-
-                files.push(
-                {
-                    path:
-                        `images/image_${imageIndex}.webp`,
-
-                    data:
-                        extracted,
-
-                    type:
-                        "WEBP",
-
-                    offset:
-                        found
-                });
-
-                position =
-                    found +
-                    extracted.length;
-
-                continue;
-            }
-        }
-
-
-        position =
-            found + 4;
-    }
-
-
-    /*
-     * --------------------------------------------------------
-     * OGG
-     * --------------------------------------------------------
-     */
-
-    setStatus(
-        "🎵 Extrayendo OGG..."
-    );
-
-    const ogg =
-    [
-        0x4F,
-        0x67,
-        0x67,
-        0x53
-    ];
-
-    position = 0;
-
-    while (true)
-    {
-        const found =
-            findSignature(
-                data,
-                ogg,
-                position
-            );
-
-        if (
-            found === -1
-        )
-        {
-            break;
-        }
-
-        const extracted =
-            extractOGG(
-                data,
-                found
-            );
-
-        if (
-            extracted
-        )
-        {
-            audioIndex++;
-
-            files.push(
-            {
-                path:
-                    `audio/audio_${audioIndex}.ogg`,
-
-                data:
-                    extracted,
-
-                type:
-                    "OGG",
-
-                offset:
-                    found
-            });
-
-            position =
-                found +
-                extracted.length;
-        }
-        else
-        {
-            position =
-                found + 4;
-        }
-    }
-
-
-    /*
-     * --------------------------------------------------------
-     * MP4
-     * --------------------------------------------------------
-     */
-
-    setStatus(
-        "🎬 Buscando MP4..."
-    );
-
-    const ftyp =
-        ascii("ftyp");
-
-    position = 0;
-
-    while (true)
-    {
-        const found =
-            findSignature(
-                data,
-                ftyp,
-                position
-            );
-
-        if (
-            found === -1
-        )
-        {
-            break;
-        }
-
-        const start =
-            found - 4;
-
-        if (
-            start < 0
-        )
-        {
-            position =
-                found + 4;
-
-            continue;
-        }
-
-        const boxSize =
-            readU32BE(
-                data,
-                start
-            );
-
-        if (
-            boxSize < 8 ||
-            start + boxSize >
-            data.length
-        )
-        {
-            position =
-                found + 4;
-
-            continue;
-        }
-
-
-        /*
-         * Buscamos el siguiente recurso reconocido
-         * como delimitador aproximado.
-         */
-
-        let end =
-            data.length;
-
-
-        const nextPNG =
-            findSignature(
-                data,
-                png,
-                start + boxSize
-            );
-
-        const nextOGG =
-            findSignature(
-                data,
-                ogg,
-                start + boxSize
-            );
-
-        if (
-            nextPNG !== -1
-        )
-        {
-            end =
-                Math.min(
-                    end,
-                    nextPNG
-                );
-        }
-
-        if (
-            nextOGG !== -1
-        )
-        {
-            end =
-                Math.min(
-                    end,
-                    nextOGG
-                );
-        }
-
-
-        if (
-            end >
-            start + 1024
-        )
-        {
-            videoIndex++;
-
-            files.push(
-            {
-                path:
-                    `video/video_${videoIndex}.mp4`,
-
-                data:
-                    data.slice(
-                        start,
-                        end
-                    ),
-
-                type:
-                    "MP4",
-
-                offset:
-                    start
-            });
-        }
-
-
-        position =
-            Math.max(
-                end,
-                found + 4
-            );
-    }
-
-
-    /*
-     * --------------------------------------------------------
-     * JSON
-     * --------------------------------------------------------
-     */
-
-    setStatus(
-        "📊 Buscando JSON..."
-    );
-
-    position = 0;
-
-    while (true)
-    {
-        const found =
-            findSignature(
-                data,
-                [0x7B],
-                position
-            );
-
-        if (
-            found === -1
-        )
-        {
-            break;
-        }
-
-        const extracted =
-            extractJSONObject(
-                data,
-                found
-            );
-
-        if (
-            extracted
-        )
-        {
-            jsonIndex++;
-
-            files.push(
-            {
-                path:
-                    `data/data_${jsonIndex}.json`,
-
-                data:
-                    extracted.data,
-
-                type:
-                    "JSON",
-
-                offset:
-                    found
-            });
-
-            position =
-                extracted.end;
-        }
-        else
-        {
-            position =
-                found + 1;
-        }
-    }
-
-
-    return files;
-}
-
-
-/* ============================================================
- ZIP → HTML5
-============================================================ */
-
-zipBuild.addEventListener(
+buildButton.addEventListener(
     "click",
     async () =>
     {
         if (
             !zipFiles.length ||
-            !zipAnalysis
+            !analysis
         )
         {
             return;
         }
 
-        zipBuild.disabled =
+
+        buildButton.disabled =
             true;
 
-        zipAnalyze.disabled =
+        analyzeButton.disabled =
             true;
 
 
         try
         {
             setStatus(
-                "🌐 Construyendo proyecto HTML5..."
+                "🌐 Preparando proyecto web..."
             );
+
 
             setProgress(10);
 
@@ -2372,20 +1290,19 @@ zipBuild.addEventListener(
             const project =
                 buildWebProject(
                     zipFiles,
-                    zipAnalysis
+                    analysis
                 );
 
 
-            setProgress(70);
+            setProgress(40);
 
 
             /*
-             * STORE = 0.
-             * Evita consumir mucha RAM comprimiendo
-             * cientos de MB.
+             * Sin compresión.
+             * Esto reduce muchísimo el uso de CPU/RAM.
              */
 
-            const zip =
+            const output =
                 fflate.zipSync(
                     project,
                     {
@@ -2394,12 +1311,12 @@ zipBuild.addEventListener(
                 );
 
 
-            setProgress(100);
+            setProgress(90);
 
 
             const blob =
                 new Blob(
-                    [zip],
+                    [output],
                     {
                         type:
                             "application/zip"
@@ -2413,46 +1330,33 @@ zipBuild.addEventListener(
             );
 
 
-            clearResults();
-
-            addResult(
-                "Archivos originales",
-                zipFiles.length
-            );
-
-            addResult(
-                "Charts",
-                zipAnalysis.charts.length
-            );
-
-            addResult(
-                "Proyecto",
-                "MissaWeb.zip ✅"
-            );
+            setProgress(100);
 
 
             setStatus(
-                "✅ PROYECTO GENERADO\n\n" +
+                "✅ MISSA WEB GENERADO\n\n" +
                 "MissaWeb.zip fue descargado.\n\n" +
-                "El ZIP contiene los archivos originales " +
-                "dentro de assets/original/."
+                "Los archivos originales fueron " +
+                "conservados en:\n" +
+                "assets/original/"
             );
         }
         catch(error)
         {
             console.error(error);
 
+
             setStatus(
-                "❌ ERROR CONSTRUYENDO HTML5:\n\n" +
+                "❌ ERROR GENERANDO PROYECTO\n\n" +
                 error.message
             );
         }
         finally
         {
-            zipBuild.disabled =
+            buildButton.disabled =
                 false;
 
-            zipAnalyze.disabled =
+            analyzeButton.disabled =
                 false;
         }
     }
@@ -2460,11 +1364,11 @@ zipBuild.addEventListener(
 
 
 /* ============================================================
- CREAR PROYECTO WEB
+ PROYECTO WEB
 ============================================================ */
 
 function buildWebProject(
-    originalFiles,
+    files,
     analysis
 )
 {
@@ -2472,18 +1376,14 @@ function buildWebProject(
 
 
     /*
-     * ============================================
-     * COPIAR DATOS REALES
-     * ============================================
-     *
-     * NO inventamos assets.
-     *
-     * Todo lo que estaba en el ZIP se conserva.
+     * --------------------------------------------------------
+     * TODOS LOS ARCHIVOS ORIGINALES
+     * --------------------------------------------------------
      */
 
     for (
         const file
-        of originalFiles
+        of files
     )
     {
         if (
@@ -2494,22 +1394,24 @@ function buildWebProject(
             continue;
         }
 
-        const cleanPath =
-            escapePath(
+
+        const safe =
+            cleanPath(
                 file.name
             );
 
+
         project[
-            `assets/original/${cleanPath}`
+            `assets/original/${safe}`
         ] =
             file.data;
     }
 
 
     /*
-     * ============================================
+     * --------------------------------------------------------
      * MANIFEST
-     * ============================================
+     * --------------------------------------------------------
      */
 
     const manifest =
@@ -2517,19 +1419,76 @@ function buildWebProject(
         converter:
         {
             version:
-                "9.0.0"
+                "10.0.0"
         },
 
         source:
         {
-            zip:
+            filename:
                 selectedZip.name,
 
-            originalFiles:
-                originalFiles.length
+            size:
+                selectedZip.size
         },
 
-        resources:
+        statistics:
+        {
+            total:
+                analysis.total,
+
+            totalBytes:
+                analysis.totalBytes,
+
+            images:
+                analysis.images.length,
+
+            audio:
+                analysis.audio.length,
+
+            videos:
+                analysis.videos.length,
+
+            fonts:
+                analysis.fonts.length,
+
+            json:
+                analysis.json.length,
+
+            charts:
+                analysis.charts.length,
+
+            lua:
+                analysis.lua.length,
+
+            scripts:
+                analysis.scripts.length,
+
+            shaders:
+                analysis.shaders.length,
+
+            text:
+                analysis.text.length,
+
+            archives:
+                analysis.archives.length,
+
+            other:
+                analysis.other.length,
+
+            characters:
+                analysis.characters.length,
+
+            stages:
+                analysis.stages.length,
+
+            songs:
+                analysis.songs.length,
+
+            events:
+                analysis.events.length
+        },
+
+        files:
         {
             images:
                 analysis.images,
@@ -2540,14 +1499,29 @@ function buildWebProject(
             videos:
                 analysis.videos,
 
+            fonts:
+                analysis.fonts,
+
             json:
                 analysis.json,
 
             lua:
                 analysis.lua,
 
-            events:
-                analysis.events
+            scripts:
+                analysis.scripts,
+
+            shaders:
+                analysis.shaders,
+
+            text:
+                analysis.text,
+
+            archives:
+                analysis.archives,
+
+            other:
+                analysis.other
         },
 
         charts:
@@ -2557,7 +1531,13 @@ function buildWebProject(
             analysis.characters,
 
         stages:
-            analysis.stages
+            analysis.stages,
+
+        songs:
+            analysis.songs,
+
+        events:
+            analysis.events
     };
 
 
@@ -2575,9 +1555,9 @@ function buildWebProject(
 
 
     /*
-     * ============================================
-     * WEB HTML
-     * ============================================
+     * --------------------------------------------------------
+     * HTML
+     * --------------------------------------------------------
      */
 
     project[
@@ -2592,9 +1572,9 @@ function buildWebProject(
 
 
     /*
-     * ============================================
-     * GAME ENGINE
-     * ============================================
+     * --------------------------------------------------------
+     * GAME JS
+     * --------------------------------------------------------
      */
 
     project[
@@ -2607,9 +1587,9 @@ function buildWebProject(
 
 
     /*
-     * ============================================
+     * --------------------------------------------------------
      * CSS
-     * ============================================
+     * --------------------------------------------------------
      */
 
     project[
@@ -2622,9 +1602,9 @@ function buildWebProject(
 
 
     /*
-     * ============================================
+     * --------------------------------------------------------
      * README
-     * ============================================
+     * --------------------------------------------------------
      */
 
     project[
@@ -2643,84 +1623,32 @@ function buildWebProject(
 
 
 /* ============================================================
- GAME HTML
+ HTML JUEGO
 ============================================================ */
 
 function createGameHTML(
     analysis
 )
 {
-    let chartsHTML = "";
-
-    if (
-        analysis.charts.length
-    )
-    {
-        chartsHTML =
-            analysis.charts
-                .map(
-                    (chart, index) =>
-                    `
-<option value="${
-    escapePath(
-        chart.file
-    )
-}">
-${
+    const charts =
+        analysis.charts
+            .map(
+                (chart, index) =>
+                `
+<option value="${escapeHTMLAttribute(
+    chart.file
+)}">
+${escapeHTML(
     chart.song ||
     `Chart ${index + 1}`
-}
+)}
 </option>
 `
-                )
-                .join("");
-    }
-    else
-    {
-        chartsHTML =
-`
-<option>
-No se detectaron charts
-</option>
-`;
-    }
+            )
+            .join("");
 
 
-    let audioHTML = "";
-
-    if (
-        analysis.audio.length
-    )
-    {
-        audioHTML =
-            analysis.audio
-                .map(
-                    audio =>
-                    `
-<option value="${
-    escapePath(audio)
-}">
-${
-    escapePath(audio)
-}
-</option>
-`
-                )
-                .join("");
-    }
-    else
-    {
-        audioHTML =
-`
-<option>
-No se detectó audio
-</option>
-`;
-    }
-
-
-    return `
-<!DOCTYPE html>
+    return `<!DOCTYPE html>
 
 <html lang="es">
 
@@ -2733,7 +1661,7 @@ No se detectó audio
     content="width=device-width,initial-scale=1"
 >
 
-<title>Missa V3 Web</title>
+<title>Missa Web</title>
 
 <link
     rel="stylesheet"
@@ -2746,54 +1674,51 @@ No se detectó audio
 
 <div id="menu">
 
-<h1>🎵 MISSA V3 WEB</h1>
+<h1>🎵 MISSA WEB</h1>
 
 <p>
-Los recursos pertenecen al paquete extraído.
+Proyecto creado a partir de los datos reales.
 </p>
 
+${
+    charts
+        ? `
 <label>
 Chart
 </label>
 
 <select id="chart">
 
-${chartsHTML}
+${charts}
 
 </select>
 
 <br>
+`
+        : `
+<p>
+⚠️ No se detectaron charts automáticamente.
+</p>
+`
+}
 
-<label>
-Audio
-</label>
-
-<select id="audio">
-
-${audioHTML}
-
-</select>
-
-<br>
-
-<button id="play">
-▶ JUGAR
+<button id="inspect">
+🔎 VER MANIFEST
 </button>
 
-<p id="info">
-Esperando...
+<p id="status">
+Preparado.
 </p>
 
 </div>
 
-<canvas id="gameCanvas"></canvas>
+<canvas id="game"></canvas>
 
 <script src="game.js"></script>
 
 </body>
 
-</html>
-`;
+</html>`;
 }
 
 
@@ -2803,936 +1728,64 @@ Esperando...
 
 function createGameJS()
 {
-    return String.raw`
+    return `
 "use strict";
 
-
-const canvas =
+const status =
     document.getElementById(
-        "gameCanvas"
+        "status"
     );
 
-const ctx =
-    canvas.getContext(
-        "2d"
-    );
-
-const menu =
+const inspectButton =
     document.getElementById(
-        "menu"
-    );
-
-const chartSelect =
-    document.getElementById(
-        "chart"
-    );
-
-const audioSelect =
-    document.getElementById(
-        "audio"
-    );
-
-const playButton =
-    document.getElementById(
-        "play"
-    );
-
-const info =
-    document.getElementById(
-        "info"
+        "inspect"
     );
 
 
-const KEYS =
-[
-    "ArrowLeft",
-    "ArrowDown",
-    "ArrowUp",
-    "ArrowRight"
-];
-
-
-let chart = null;
-let notes = [];
-let audio = null;
-
-let playing = false;
-
-let score = 0;
-let combo = 0;
-let misses = 0;
-let health = 1;
-
-
-function resize()
-{
-    canvas.width =
-        innerWidth;
-
-    canvas.height =
-        innerHeight;
-}
-
-addEventListener(
-    "resize",
-    resize
-);
-
-resize();
-
-
-/*
-============================================================
- CARGAR CHART
-
- El chart se encuentra en:
-
- assets/original/<ruta>
-============================================================
-*/
-
-async function loadChart(
-    originalPath
-)
-{
-    const url =
-        "assets/original/" +
-        originalPath;
-
-    const response =
-        await fetch(
-            url
-        );
-
-    if (
-        !response.ok
-    )
-    {
-        throw new Error(
-            "No se pudo cargar el chart:\n" +
-            originalPath
-        );
-    }
-
-    const data =
-        await response.json();
-
-
-    if (
-        !data.song ||
-        !Array.isArray(
-            data.song.notes
-        )
-    )
-    {
-        throw new Error(
-            "Este archivo no tiene " +
-            "una estructura de chart compatible."
-        );
-    }
-
-
-    chart =
-        data.song;
-
-    notes = [];
-
-
-    for (
-        const section
-        of chart.notes
-    )
-    {
-        if (
-            !section ||
-            !Array.isArray(
-                section.sectionNotes
-            )
-        )
-        {
-            continue;
-        }
-
-
-        for (
-            const raw
-            of section.sectionNotes
-        )
-        {
-            if (
-                !Array.isArray(raw) ||
-                raw.length < 2
-            )
-            {
-                continue;
-            }
-
-
-            const time =
-                Number(
-                    raw[0]
-                );
-
-            const lane =
-                (
-                    Number(
-                        raw[1]
-                    ) %
-                    4 +
-                    4
-                ) % 4;
-
-
-            notes.push(
-            {
-                time,
-                lane,
-                hit: false,
-                missed: false
-            });
-        }
-    }
-
-
-    notes.sort(
-        (a,b) =>
-            a.time -
-            b.time
-    );
-
-
-    info.textContent =
-        "Canción: " +
-        (
-            chart.song ||
-            "Unknown"
-        ) +
-        " | BPM: " +
-        (
-            chart.bpm ||
-            "?"
-        ) +
-        " | Notas: " +
-        notes.length;
-}
-
-
-/*
-============================================================
- AUDIO
-============================================================
-*/
-
-async function loadAudio(
-    originalPath
-)
-{
-    const url =
-        "assets/original/" +
-        originalPath;
-
-
-    audio =
-        new Audio(
-            url
-        );
-
-
-    audio.preload =
-        "auto";
-
-
-    await new Promise(
-        (resolve,reject) =>
-        {
-            audio.addEventListener(
-                "canplaythrough",
-                resolve,
-                {
-                    once:true
-                }
-            );
-
-            audio.addEventListener(
-                "error",
-                () =>
-                {
-                    reject(
-                        new Error(
-                            "No se pudo cargar:\n" +
-                            originalPath
-                        )
-                    );
-                },
-                {
-                    once:true
-                }
-            );
-        }
-    );
-}
-
-
-/*
-============================================================
- JUGAR
-============================================================
-*/
-
-playButton.addEventListener(
+inspectButton.addEventListener(
     "click",
     async () =>
     {
         try
         {
-            if (
-                !chartSelect.value ||
-                chartSelect.value.startsWith(
-                    "No se"
-                )
-            )
-            {
-                throw new Error(
-                    "No hay charts disponibles."
+            const response =
+                await fetch(
+                    "manifest.json"
                 );
-            }
 
+            const manifest =
+                await response.json();
 
-            if (
-                !audioSelect.value ||
-                audioSelect.value.startsWith(
-                    "No se"
-                )
-            )
-            {
-                throw new Error(
-                    "No hay audio disponible."
-                );
-            }
-
-
-            await loadChart(
-                chartSelect.value
-            );
-
-            await loadAudio(
-                audioSelect.value
-            );
-
-
-            for (
-                const note
-                of notes
-            )
-            {
-                note.hit =
-                    false;
-
-                note.missed =
-                    false;
-            }
-
-
-            score = 0;
-            combo = 0;
-            misses = 0;
-            health = 1;
-
-
-            menu.style.display =
-                "none";
-
-
-            playing = true;
-
-
-            await audio.play();
+            status.textContent =
+                "Archivos: " +
+                manifest.statistics.total +
+                "\\n" +
+                "Charts: " +
+                manifest.statistics.charts +
+                "\\n" +
+                "Audio: " +
+                manifest.statistics.audio +
+                "\\n" +
+                "Imágenes: " +
+                manifest.statistics.images +
+                "\\n" +
+                "Vídeos: " +
+                manifest.statistics.videos;
         }
         catch(error)
         {
-            console.error(error);
-
-            alert(
-                error.message
-            );
+            status.textContent =
+                "Error leyendo manifest: " +
+                error.message;
         }
     }
-);
-
-
-/*
-============================================================
- INPUT
-============================================================
-*/
-
-addEventListener(
-    "keydown",
-    event =>
-    {
-        if (
-            !playing
-        )
-        {
-            return;
-        }
-
-
-        const lane =
-            KEYS.indexOf(
-                event.code
-            );
-
-
-        if (
-            lane < 0
-        )
-        {
-            return;
-        }
-
-
-        event.preventDefault();
-
-
-        hitNote(
-            lane
-        );
-    }
-);
-
-
-function hitNote(
-    lane
-)
-{
-    if (
-        !audio
-    )
-    {
-        return;
-    }
-
-
-    const now =
-        audio.currentTime *
-        1000;
-
-
-    let best =
-        null;
-
-    let distance =
-        Infinity;
-
-
-    for (
-        const note
-        of notes
-    )
-    {
-        if (
-            note.hit ||
-            note.missed
-        )
-        {
-            continue;
-        }
-
-
-        if (
-            note.lane !== lane
-        )
-        {
-            continue;
-        }
-
-
-        const d =
-            Math.abs(
-                note.time -
-                now
-            );
-
-
-        if (
-            d < distance
-        )
-        {
-            distance =
-                d;
-
-            best =
-                note;
-        }
-    }
-
-
-    if (
-        !best
-    )
-    {
-        return;
-    }
-
-
-    if (
-        distance <= 45
-    )
-    {
-        best.hit =
-            true;
-
-        score +=
-            350;
-
-        combo++;
-    }
-    else if (
-        distance <= 90
-    )
-    {
-        best.hit =
-            true;
-
-        score +=
-            200;
-
-        combo++;
-    }
-    else if (
-        distance <= 135
-    )
-    {
-        best.hit =
-            true;
-
-        score +=
-            100;
-
-        combo++;
-    }
-}
-
-
-/*
-============================================================
- UPDATE
-============================================================
-*/
-
-function update()
-{
-    if (
-        !playing ||
-        !audio
-    )
-    {
-        return;
-    }
-
-
-    const now =
-        audio.currentTime *
-        1000;
-
-
-    for (
-        const note
-        of notes
-    )
-    {
-        if (
-            note.hit ||
-            note.missed
-        )
-        {
-            continue;
-        }
-
-
-        if (
-            now -
-            note.time >
-            180
-        )
-        {
-            note.missed =
-                true;
-
-            combo = 0;
-
-            misses++;
-
-            health =
-                Math.max(
-                    0,
-                    health - 0.05
-                );
-        }
-    }
-
-
-    if (
-        audio.ended
-    )
-    {
-        playing =
-            false;
-
-        menu.style.display =
-            "block";
-    }
-}
-
-
-/*
-============================================================
- DIBUJAR FLECHA
-============================================================
-*/
-
-function drawArrow(
-    x,
-    y,
-    lane,
-    size
-)
-{
-    ctx.save();
-
-
-    ctx.translate(
-        x,
-        y
-    );
-
-
-    if (
-        lane === 0
-    )
-    {
-        ctx.rotate(
-            -Math.PI / 2
-        );
-    }
-
-
-    if (
-        lane === 1
-    )
-    {
-        ctx.rotate(
-            Math.PI
-        );
-    }
-
-
-    if (
-        lane === 3
-    )
-    {
-        ctx.rotate(
-            Math.PI / 2
-        );
-    }
-
-
-    ctx.beginPath();
-
-
-    ctx.moveTo(
-        size,
-        0
-    );
-
-
-    ctx.lineTo(
-        0,
-        -size
-    );
-
-
-    ctx.lineTo(
-        -size,
-        0
-    );
-
-
-    ctx.lineTo(
-        -size / 2,
-        0
-    );
-
-
-    ctx.lineTo(
-        -size / 2,
-        size
-    );
-
-
-    ctx.lineTo(
-        size / 2,
-        size
-    );
-
-
-    ctx.lineTo(
-        size / 2,
-        0
-    );
-
-
-    ctx.closePath();
-
-
-    ctx.fill();
-
-
-    ctx.restore();
-}
-
-
-/*
-============================================================
- DIBUJAR JUEGO
-============================================================
-*/
-
-function draw()
-{
-    ctx.fillStyle =
-        "#101010";
-
-
-    ctx.fillRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
-
-
-    ctx.fillStyle =
-        "#ffffff";
-
-
-    ctx.font =
-        "bold 20px Arial";
-
-
-    ctx.fillText(
-        "Score: " +
-        score,
-        20,
-        30
-    );
-
-
-    ctx.fillText(
-        "Combo: " +
-        combo,
-        20,
-        60
-    );
-
-
-    ctx.fillText(
-        "Misses: " +
-        misses,
-        20,
-        90
-    );
-
-
-    const laneWidth =
-        Math.min(
-            110,
-            canvas.width / 6
-        );
-
-
-    const total =
-        laneWidth *
-        4;
-
-
-    const startX =
-        (
-            canvas.width -
-            total
-        ) / 2;
-
-
-    const receptorY =
-        canvas.height -
-        150;
-
-
-    /*
-     * Receptores
-     */
-
-    for (
-        let lane = 0;
-        lane < 4;
-        lane++
-    )
-    {
-        ctx.strokeStyle =
-            "#ffffff";
-
-        ctx.lineWidth =
-            3;
-
-
-        ctx.strokeRect(
-            startX +
-            lane *
-            laneWidth +
-            8,
-
-            receptorY,
-
-            laneWidth -
-            16,
-
-            60
-        );
-
-
-        drawArrow(
-            startX +
-            lane *
-            laneWidth +
-            laneWidth / 2,
-
-            receptorY + 30,
-
-            lane,
-
-            20
-        );
-    }
-
-
-    /*
-     * Notas
-     */
-
-    if (
-        audio
-    )
-    {
-        const now =
-            audio.currentTime *
-            1000;
-
-
-        for (
-            const note
-            of notes
-        )
-        {
-            if (
-                note.hit ||
-                note.missed
-            )
-            {
-                continue;
-            }
-
-
-            const delta =
-                note.time -
-                now;
-
-
-            const y =
-                receptorY -
-                delta *
-                0.55;
-
-
-            if (
-                y <
-                -100 ||
-                y >
-                canvas.height +
-                100
-            )
-            {
-                continue;
-            }
-
-
-            ctx.fillStyle =
-                "#ffffff";
-
-
-            ctx.fillRect(
-                startX +
-                note.lane *
-                laneWidth +
-                10,
-
-                y,
-
-                laneWidth -
-                20,
-
-                45
-            );
-
-
-            ctx.fillStyle =
-                "#111";
-
-
-            drawArrow(
-                startX +
-                note.lane *
-                laneWidth +
-                laneWidth / 2,
-
-                y + 22,
-
-                note.lane,
-
-                17
-            );
-        }
-    }
-}
-
-
-/*
-============================================================
- LOOP
-============================================================
-*/
-
-function loop()
-{
-    update();
-
-    draw();
-
-    requestAnimationFrame(
-        loop
-    );
-}
-
-
-requestAnimationFrame(
-    loop
 );
 `;
 }
 
 
 /* ============================================================
- GAME CSS
+ CSS JUEGO
 ============================================================ */
 
 function createGameCSS()
@@ -3742,7 +1795,6 @@ html,
 body
 {
     margin:0;
-    padding:0;
 
     width:100%;
     height:100%;
@@ -3774,7 +1826,7 @@ body
         );
 
     width:min(
-        550px,
+        600px,
         90%
     );
 
@@ -3790,17 +1842,12 @@ body
     text-align:center;
 }
 
-#menu h1
+button,
+select
 {
-    margin-top:0;
-}
+    margin-top:12px;
 
-select,
-button
-{
     padding:12px;
-
-    margin:10px;
 
     border-radius:8px;
 }
@@ -3812,7 +1859,7 @@ button
     font-weight:bold;
 }
 
-#gameCanvas
+#game
 {
     display:block;
 
@@ -3832,16 +1879,21 @@ function createREADME(
 )
 {
     return `
-MISSA WEB
-=========
+MISSA WEB V10
+=============
 
-Conversor V9.
+FUENTE:
+${selectedZip.name}
 
-Este proyecto conserva los archivos reales
-que estaban dentro del ZIP original.
+TODO EL ZIP FUE CONSERVADO.
 
 ARCHIVOS:
-${zipFiles.length}
+${analysis.total}
+
+TAMAÑO:
+${formatBytes(
+    analysis.totalBytes
+)}
 
 IMÁGENES:
 ${analysis.images.length}
@@ -3849,8 +1901,11 @@ ${analysis.images.length}
 AUDIO:
 ${analysis.audio.length}
 
-VÍDEOS:
+VIDEOS:
 ${analysis.videos.length}
+
+FUENTES:
+${analysis.fonts.length}
 
 JSON:
 ${analysis.json.length}
@@ -3861,11 +1916,29 @@ ${analysis.charts.length}
 LUA:
 ${analysis.lua.length}
 
+SCRIPTS:
+${analysis.scripts.length}
+
+SHADERS:
+${analysis.shaders.length}
+
+TEXTO:
+${analysis.text.length}
+
+ARCHIVOS EMPAQUETADOS:
+${analysis.archives.length}
+
+OTROS:
+${analysis.other.length}
+
 PERSONAJES:
 ${analysis.characters.length}
 
 STAGES:
 ${analysis.stages.length}
+
+SONGS:
+${analysis.songs.length}
 
 EVENTOS:
 ${analysis.events.length}
@@ -3874,32 +1947,63 @@ ${analysis.events.length}
 ESTRUCTURA:
 
 assets/original/
-    Archivos originales del ZIP.
+    TODOS los archivos del ZIP original.
 
 manifest.json
-    Mapa de los datos encontrados.
+    Mapa completo del contenido.
 
 index.html
-    Punto de entrada web.
-
 game.js
-    Runtime FNF experimental.
-
 style.css
-    Interfaz.
+    Base del proyecto web.
 
 
 IMPORTANTE:
 
-El objetivo es utilizar los datos reales del juego.
+Esta versión NO elimina archivos desconocidos.
 
-Esta versión todavía no reproduce todas las
-funciones de Psych Engine.
+El objetivo es tener una copia web completa
+del contenido recuperado y construir encima
+el runtime FNF.
 
-El siguiente trabajo consiste en conectar
-automáticamente los charts, audios, personajes,
-stages, eventos y vídeos reales del mod.
+El siguiente paso es interpretar los datos
+reales para reproducir el comportamiento del
+juego original.
 `;
+}
+
+
+/* ============================================================
+ ESCAPAR HTML
+============================================================ */
+
+function escapeHTML(value)
+{
+    return String(value)
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+        .replaceAll(
+            ">",
+            "&gt;"
+        );
+}
+
+
+function escapeHTMLAttribute(value)
+{
+    return escapeHTML(
+        value
+    )
+        .replaceAll(
+            '"',
+            "&quot;"
+        );
 }
 
 
@@ -3947,10 +2051,10 @@ function downloadBlob(
 
 
 /* ============================================================
- INICIO
+ START
 ============================================================ */
 
 setStatus(
-    "✅ FNF Web Converter V9 cargado.\n\n" +
-    "EXE → ZIP o ZIP → HTML5."
+    "✅ V10 cargada.\n\n" +
+    "Selecciona el ZIP completo del juego."
 );
