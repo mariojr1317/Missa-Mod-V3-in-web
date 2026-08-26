@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
     <meta charset="UTF-8">
 
@@ -9,7 +8,7 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>FNF Web Converter V7</title>
+    <title>FNF Web Converter</title>
 
     <link rel="stylesheet" href="style.css">
 </head>
@@ -22,65 +21,138 @@
         <h1>🎵 FNF Web Converter</h1>
 
         <p>
-            EXE de FNF → recursos → proyecto HTML5
+            Convierte recursos de FNF a un proyecto web
         </p>
 
         <span class="version">
-            V7 MULTIMEDIA EXTRACTOR
+            V8 ZIP → HTML5
         </span>
     </header>
 
-    <main class="card">
 
-        <label id="dropZone" class="drop-zone">
+    <!-- =====================================================
+         EXE
+    ====================================================== -->
+
+    <section class="card">
+
+        <h2>1️⃣ EXE → ZIP</h2>
+
+        <p>
+            Extrae recursos del ejecutable de Windows.
+        </p>
+
+        <label
+            id="exeDrop"
+            class="drop-zone"
+        >
 
             <div class="drop-icon">
                 📦
             </div>
 
             <strong>
-                Selecciona tu MissaMod.exe
+                Seleccionar EXE
             </strong>
 
             <span>
-                o arrastra el EXE aquí
+                MissaMod.exe
             </span>
 
             <input
-                id="fileInput"
+                id="exeInput"
                 type="file"
                 accept=".exe"
             >
 
         </label>
 
-        <div class="buttons">
+        <button
+            id="exeAnalyze"
+            disabled
+        >
+            🔎 Analizar EXE
+        </button>
 
-            <button
-                id="analyzeButton"
-                disabled
+        <button
+            id="exeExtract"
+            disabled
+        >
+            🚀 Extraer recursos
+        </button>
+
+    </section>
+
+
+    <!-- =====================================================
+         ZIP
+    ====================================================== -->
+
+    <section class="card">
+
+        <h2>2️⃣ ZIP → HTML5</h2>
+
+        <p>
+            Selecciona el ZIP que ya extrajiste.
+            La web lo analizará y construirá un proyecto.
+        </p>
+
+        <label
+            id="zipDrop"
+            class="drop-zone"
+        >
+
+            <div class="drop-icon">
+                📁
+            </div>
+
+            <strong>
+                Seleccionar ZIP
+            </strong>
+
+            <span>
+                MissaExtracted.zip
+            </span>
+
+            <input
+                id="zipInput"
+                type="file"
+                accept=".zip"
             >
-                🔎 Analizar
-            </button>
 
-            <button
-                id="extractButton"
-                disabled
-            >
-                🚀 EXTRAER Y GENERAR ZIP
-            </button>
+        </label>
 
-        </div>
+        <button
+            id="zipAnalyze"
+            disabled
+        >
+            🔎 Analizar ZIP
+        </button>
 
-        <div class="progress">
+        <button
+            id="zipBuild"
+            disabled
+        >
+            🌐 CONVERTIR ZIP A HTML5
+        </button>
+
+    </section>
+
+
+    <section class="card">
+
+        <h2>📊 Estado</h2>
+
+        <div id="progressContainer">
             <div id="progressBar"></div>
         </div>
 
-        <pre id="status">Esperando archivo...</pre>
+        <pre id="status">Esperando...</pre>
 
         <div id="results"></div>
 
-    </main>
+    </section>
+
 
     <footer>
         Procesamiento local en el navegador.
@@ -88,23 +160,13 @@
 
 </div>
 
-<script>
-    document.getElementById("status").textContent =
-        "✅ JavaScript de la página funciona.\n\nCargando conversor...";
 
-    window.addEventListener("error", function (event) {
-        document.getElementById("status").textContent =
-            "❌ ERROR EN CONVERTER.JS:\n\n" +
-            event.message;
-    });
+<!-- Librería para leer/escribir ZIP -->
+<script
+    src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js">
 </script>
 
-<script src="./converter.js?v=7"></script>
-
-<script>
-    document.getElementById("status").textContent =
-        "✅ FNF Web Converter V7 cargado.\n\nSelecciona tu EXE.";
-</script>
+<script src="converter.js"></script>
 
 </body>
 </html>
