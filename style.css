@@ -31,7 +31,7 @@ body {
 
 .app {
     width: 100%;
-    max-width: 950px;
+    max-width: 1000px;
 
     margin: auto;
 }
@@ -64,18 +64,15 @@ header p {
 
     margin-top: 8px;
 
-    padding:
-        7px 13px;
+    padding: 7px 13px;
 
-    border-radius:
-        999px;
+    border-radius: 999px;
 
     background: #252525;
 
     color: #aaa;
 
-    font-family:
-        monospace;
+    font-family: monospace;
 }
 
 .card {
@@ -85,22 +82,13 @@ header p {
 
     background: #181818;
 
-    border:
-        1px solid #333;
+    border: 1px solid #333;
 
     border-radius: 20px;
 
     box-shadow:
         0 20px 60px
         rgba(0, 0, 0, 0.45);
-}
-
-.card h2 {
-    margin-top: 0;
-}
-
-.card p {
-    color: #aaa;
 }
 
 .drop-zone {
@@ -127,19 +115,13 @@ header p {
 
     transition:
         background .2s,
-        border-color .2s,
-        transform .2s;
+        border-color .2s;
 }
 
 .drop-zone:hover,
 .drop-zone.dragging {
     background: #222;
-
-    border-color:
-        white;
-
-    transform:
-        scale(1.01);
+    border-color: white;
 }
 
 .drop-icon {
@@ -190,11 +172,6 @@ button {
     cursor: pointer;
 }
 
-button:hover:not(:disabled) {
-    transform:
-        translateY(-1px);
-}
-
 button:disabled {
     opacity: .4;
 
@@ -208,12 +185,11 @@ button:disabled {
 
     margin-bottom: 20px;
 
-    border-radius:
-        999px;
+    background: #333;
+
+    border-radius: 999px;
 
     overflow: hidden;
-
-    background: #333;
 }
 
 #progressBar {
@@ -223,8 +199,7 @@ button:disabled {
 
     background: white;
 
-    transition:
-        width .15s;
+    transition: width .15s;
 }
 
 #status {
@@ -234,15 +209,15 @@ button:disabled {
 
     padding: 18px;
 
-    border-radius: 12px;
-
     background: #090909;
 
-    color: #ddd;
+    border-radius: 12px;
 
     white-space: pre-wrap;
 
     overflow-wrap: anywhere;
+
+    color: #ddd;
 
     font-family:
         "Courier New",
@@ -269,39 +244,94 @@ button:disabled {
 .result {
     padding: 16px;
 
-    border-radius: 12px;
-
     background: #222;
+
+    border-radius: 12px;
 
     border-left:
         4px solid #777;
 }
 
 .result.good {
-    border-left-color:
-        #4caf50;
+    border-left-color: #4caf50;
 }
 
 .result.warn {
-    border-left-color:
-        #ff9800;
+    border-left-color: #ff9800;
 }
 
 .result-title {
-    margin-bottom: 8px;
-
     font-weight: bold;
+
+    margin-bottom: 8px;
 }
 
 .result-value {
     color: #bbb;
 
-    font-family:
-        monospace;
+    font-family: monospace;
 
     white-space: pre-wrap;
 
-    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+#search {
+    width: 100%;
+
+    padding: 13px;
+
+    margin-bottom: 15px;
+
+    border:
+        1px solid #444;
+
+    border-radius: 10px;
+
+    background: #0e0e0e;
+
+    color: white;
+
+    font-size: 16px;
+}
+
+#fileList {
+    max-height: 500px;
+
+    overflow: auto;
+
+    background: #0d0d0d;
+
+    border-radius: 10px;
+
+    padding: 10px;
+}
+
+.file-entry {
+    padding: 8px 10px;
+
+    border-bottom:
+        1px solid #222;
+
+    font-family: monospace;
+
+    font-size: 13px;
+
+    word-break: break-all;
+}
+
+.file-entry:last-child {
+    border-bottom: none;
+}
+
+.file-type {
+    color: #777;
+
+    margin-left: 8px;
+}
+
+.hidden {
+    display: none;
 }
 
 footer {
